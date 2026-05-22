@@ -1,0 +1,113 @@
+# ─── DAST: Análise Dinâmica de Segurança ────────────────────
+# Testa o cluster K8s contra CIS benchmarks e valida
+# configurações de rede, RBAC e políticas
+
+name: Security - DAST
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'        # Toda segunda-feira 6h
+  workflow_dispatch:             # Execução manual
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  kube-bench:
+    name: Kube-bench - CIS Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: |
+          CLUSTER_NAME=$(terraform -chdir=environments/dev output -raw eks_cluster_name)
+          aws eks update-kubeconfig --name $CLUSTER_NAME --region us-east-1
+
+      - name: Run kube-bench
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/aquasecurity/kube-bench/main/job.yaml
+          sleep 60
+          kubectl logs job/kube-bench > kube-bench-results.txt
+          kubectl delete job kube-bench
+
+      - name: Parse Results
+        id: parse
+        run: |
+          echo "### 🛡️ kube-bench Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat kube-bench-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kube-bench-results
+          path: kube-bench-results.txt
+
+  popeye:
+    name: Popeye - Cluster Sanity Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: |
+          CLUSTER_NAME=$(terraform -chdir=environments/dev output -raw eks_cluster_name)
+          aws eks update-kubeconfig --name $CLUSTER_NAME --region us-east-1
+
+      - name: Run Popeye
+        uses: derkorte/popeye-action@v1
+        with:
+          args: --out html --output-file popeye-report.html
+
+      - name: Upload Popeye Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: popeye-report
+          path: popeye-report.html
+
+  kubescape:
+    name: Kubescape - K8s Security Posture
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: |
+          CLUSTER_NAME=$(terraform -chdir=environments/dev output -raw eks_cluster_name)
+          aws eks update-kubeconfig --name $CLUSTER_NAME --region us-east-1
+
+      - name: Run Kubescape
+        uses: kubescape/action@v3
+        with:
+          format: sarif
+          output-file: kubescape-results.sarif
+
+      - name: Upload Kubescape SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: kubescape-results.sarif
+          category: kubescape

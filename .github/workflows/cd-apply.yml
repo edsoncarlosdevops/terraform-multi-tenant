@@ -1,0 +1,118 @@
+# ═══════════════════════════════════════════════════════════════
+# CD: TERRAFORM APPLY NO MERGE PARA MAIN
+# ═══════════════════════════════════════════════════════════════
+# Dispara automaticamente quando um PR e mergeado na main.
+# Aplica as mudancas APENAS nos ambientes que foram alterados.
+#
+# Regras de aprovacao (configurar no GitHub Environments):
+#   dev:     automatico (sem aprovacao)
+#   staging: aprovacao manual necessaria
+#   prod:    aprovacao manual + freeze schedule
+#
+# Para configurar: Settings > Environments > [dev/staging/prod]
+# Adicione "required reviewers" para staging e prod.
+# ═══════════════════════════════════════════════════════════════
+
+name: CD - Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+
+permissions:
+  id-token: write
+  contents: read
+  actions: write
+
+jobs:
+  # ─── Detecta quais ambientes foram alterados ────────────────
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.changed-envs.outputs.environments }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: changed-envs
+        run: |
+          ENVS=$(git diff --name-only HEAD~1...HEAD | grep '^environments/' | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          echo "environments=${ENVS:-[]}" >> $GITHUB_OUTPUT
+
+  # ─── Aplica as mudancas em cada ambiente ───────────────────
+  # Matrix strategy: executa em paralelo
+  # Environment: vincula ao ambiente do GitHub (approval gates)
+  terraform-apply:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.environments != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.detect-changes.outputs.environments) }}
+      fail-fast: false
+
+    # ─── Vincula ao ambiente do GitHub Actions ───────────────
+    # Isso permite configurar:
+    # - Required reviewers (staging, prod)
+    # - Wait timer (prod)
+    # - Secrets especificos por ambiente
+    environment:
+      name: ${{ matrix.environment }}
+      url: ${{ steps.deploy-url.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      # ─── Autenticacao AWS via OIDC ─────────────────────────
+      # ⚠️  PRECISA criar a role no AWS IAM primeiro:
+      #     arn:aws:iam::<ACCOUNT_ID>:role/github-actions-terraform
+      #     Trust policy: github.com/<org>/<repo>
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: environments/${{ matrix.environment }}
+
+      # ─── Apply (auto-approve porque ja passou pelo CI) ─────
+      # O CI ja validou o plan no PR, entao aqui so aplica
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve -no-color
+        working-directory: environments/${{ matrix.environment }}
+
+      # ─── Captura os outputs para usar em outros steps ─────
+      - name: Terraform Output
+        id: output
+        run: terraform output -json
+        working-directory: environments/${{ matrix.environment }}
+
+      # ─── Gera URL do deploy para o environment ────────────
+      - name: Deploy URL
+        id: deploy-url
+        run: |
+          ENDPOINT=$(echo '${{ steps.output.outputs.stdout }}' | jq -r '.eks_cluster_endpoint.value // "none"')
+          echo "url=https://$ENDPOINT" >> $GITHUB_OUTPUT
+
+      # ─── Notifica o Slack sobre o deploy ─────────────────
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v2
+        if: always()
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "🚀 *Apply concluído* - `${{ matrix.environment }}`\nStatus: ${{ job.status }}\nRepo: ${{ github.repository }}\nCommit: ${{ github.sha }}"
+            }

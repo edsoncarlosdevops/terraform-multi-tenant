@@ -1,0 +1,54 @@
+# ─── Versionamento Semântico para Infraestrutura ────────────
+# Cria tags no repositório seguindo SemVer
+# A tag vira o "snapshot" do código naquele momento
+
+name: Release - Version Tag
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - 'bootstrap/**'
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate Next Version
+        id: semver
+        run: |
+          # Pega a última tag, se não existir começa em v0.1.0
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
+
+          # Incrementa patch: v1.2.3 → v1.2.4
+          MAJOR=$(echo $LAST_TAG | cut -d. -f1 | tr -d 'v')
+          MINOR=$(echo $LAST_TAG | cut -d. -f2)
+          PATCH=$(echo $LAST_TAG | cut -d. -f3)
+          NEW_TAG="v$MAJOR.$MINOR.$((PATCH + 1))"
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          git log --oneline ${{ steps.semver.outputs.last_tag }}...HEAD --no-merges > release-notes.txt
+          echo "## 🏗️ Release ${{ steps.semver.outputs.new_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat release-notes.txt | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.semver.outputs.new_tag }} -m "Release ${{ steps.semver.outputs.new_tag }}"
+          git push origin ${{ steps.semver.outputs.new_tag }}

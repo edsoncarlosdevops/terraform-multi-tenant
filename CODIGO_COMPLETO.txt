@@ -1,0 +1,376 @@
+================================================================================
+  PROJETO: INFRAESTRUTURA SAAS MULTI-TENANT NA AWS COM TERRAFORM
+  ARQUIVO COMPLETO DE TODO O CÓDIGO DESENVOLVIDO
+================================================================================
+
+================================================================================
+  CONTEXTO DA CONVERSA
+================================================================================
+
+Objetivo: Demonstrar domínio prático em arquitetura e automação de infraestrutura
+SaaS multi-tenant escalável, segura e orientada a custo na AWS usando Terraform.
+
+Estrutura completa do projeto:
+  bootstrap/                        - Setup inicial do backend (S3 + DynamoDB)
+  modules/
+    tenant-network/                 - VPC + subnets + NAT + endpoints + flow logs
+    tenant-eks/                     - Cluster EKS + Karpenter + NodeGroup + IAM
+    tenant-argocd/                  - ArgoCD + ApplicationSets + AppProjects
+  environments/
+    dev/                            - Custo ZERO (sem NAT, sem flow logs)
+    staging/                        - Balanceado (1 NAT, endpoints básicos)
+    prod/                           - HA (NAT por AZ, flow logs, endpoints Interface)
+  .github/workflows/
+    ci-plan.yml                     - Plan + lint em PRs
+    cd-apply.yml                    - Apply no merge + Slack
+    infracost-preview.yml           - Custo em PRs
+    security-sast.yml               - Checkov + Trivy + Gitleaks + TFLint
+    security-dast.yml               - kube-bench + Popeye + Kubescape
+    tag-release.yml                 - Versionamento SemVer automático
+  scripts/
+    version.sh                      - Script local de versionamento
+    setup-github.sh                 - Script de preparação para push
+    test-30min.sh                   - Script de teste rápido local
+  docs/
+    github-actions-setup.md         - Instruções de configuração AWS + GitHub
+
+Decisões de arquitetura:
+  - Modelo Silo (VPC dedicada por tenant) para isolamento total
+  - Módulos divididos em arquivos por responsabilidade (máx ~50 linhas/main.tf)
+  - Apenas 4-14 variáveis por módulo (contrato enxuto)
+  - VPC Endpoints Gateway grátis para S3 e DynamoDB
+  - Flow logs + endpoints Interface APENAS em produção (custo)
+  - Karpenter para escalonamento inteligente (Spot + On-Demand)
+  - ArgoCD ApplicationSets com generators (git + list) para multi-tenant
+  - Tags de tenant, environment e VERSÃO em TODOS os recursos
+  - Versionamento SemVer automático via GitHub Actions
+  - SAST (Checkov + Trivy + Gitleaks) em PRs
+  - DAST (kube-bench + Popeye + Kubescape) semanal
+  - Comentários explicativos nos pontos críticos (wait_for_cluster, depends_on)
+
+Ferramentas usadas:
+  - Terraform >= 1.6
+  - Provider AWS ~> 5.0, Helm ~> 2.17, Kubernetes ~> 2.35, Kubectl ~> 1.14
+  - Infracost (estimativa de custo)
+  - Checkov, Trivy, TFLint, Gitleaks (SAST)
+  - kube-bench, Popeye, Kubescape (DAST)
+  - Backend: S3 + DynamoDB (bootstrap)
+
+================================================================================
+  ARQUIVO: .gitignore
+================================================================================
+
+# Terraform
+*.tfstate; *.tfstate.*; *.tfplan; *.tfplan.*
+crash.log; crash.*.log
+override.tf; override.tf.json; *_override.tf; *_override.tf.json
+.terraform/; .terraform.lock.hcl; terraform.rc
+
+# Reports
+infracost-report.*; checkov-results.sarif; trivy-results.sarif; tflint.log
+kube-bench-results.txt; popeye-report.html; kubescape-results.sarif
+
+# IDE / OS
+.vscode/; .idea/; *.swp; *.swo; *~; .DS_Store
+
+# Secrets
+*.pem; *.key; *.crt; *.cert; *.p12; *.pfx
+.env; .env.*; *.secret; secrets/
+
+# Build
+__pycache__/; *.pyc; *.pyo
+*.log; release-notes.txt
+
+================================================================================
+  ARQUIVO: .continuerc.json
+================================================================================
+
+Regras de IA:
+  - Modularização OBRIGATÓRIA (nunca main.tf monolithic)
+  - Preferir for_each sobre count
+  - S3 backend + DynamoDB state locking
+  - Tags: Environment, Tenant, ManagedBy, CostCenter, InfraVersion
+  - Karpenter > managed node groups
+  - ArgoCD ApplicationSets com generators
+  - Estrutura: modules/ + environments/dev/staging/prod/
+  - terraform fmt + validate obrigatório
+  - AWS provider >= 5.0
+
+================================================================================
+  MÓDULO: modules/tenant-network/ (8 arquivos)
+================================================================================
+
+--- variables.tf ---
+4 variáveis: tenant, environment, vpc (object com cidr, azs, subnets,
+enable_nat_gateway, single_nat_gateway), tags
+
+--- main.tf ---
+VPC + Internet Gateway com locals name_prefix.
+
+--- subnets.tf ---
+Subnets públicas (map_public_ip_on_launch=true) e privadas,
+distribuídas entre AZs.
+
+--- nat-gateway.tf ---
+Elastic IP + NAT Gateway condicional:
+  single_nat_gateway=true → 1 NAT
+  single_nat_gateway=false → NAT por AZ
+  enable_nat_gateway=false → 0 NATs (dev, $0)
+
+--- routing.tf ---
+Route tables públicas (IGW) e privadas (NAT dinâmico).
+
+--- endpoints.tf ---
+VPC Endpoints:
+  S3 + DynamoDB (Gateway) → grátis, todos ambientes
+  ECR + Logs (Interface) → apenas prod
+  Security Group para endpoints Interface
+
+--- flow-logs.tf ---
+VPC Flow Logs + IAM Role → apenas prod (retenção 90 dias)
+
+--- outputs.tf ---
+vpc_id, vpc_cidr, public_subnet_ids, private_subnet_ids,
+nat_gateway_ids, internet_gateway_id, vpc_flow_log_group
+
+================================================================================
+  MÓDULO: modules/tenant-eks/ (7 arquivos)
+================================================================================
+
+--- variables.tf ---
+14 variáveis: tenant, environment, vpc_id, private_subnet_ids,
+kubernetes_version (1.31), node_instance_types, disk_size (50GB),
+node_desired/min/max_size, enable_karpenter (true),
+karpenter_instance_families, tags, infra_version
+
+--- main.tf (com comentários críticos) ---
+"ATENCAO: Este recurso leva 10-15 minutos para criar!"
+Cluster EKS com:
+  - Endpoint privado em prod, público em dev/staging
+  - Logs completos em prod (5 tipos), só api nos demais
+  - Criptografia de secrets via KMS Key com rotação
+  - CloudWatch Log Group (90 dias prod / 7 dias dev)
+  - Security Group do cluster
+
+--- wait-for-cluster.tf (GAMBI necessária) ---
+"GAMBI? Sim. Mas necessaria."
+Aguarda cluster ACTIVE + nodes READY antes de instalar Karpenter/ArgoCD
+  - aws eks wait cluster-active
+  - Polling de nodes: até 5 minutos
+  - Só libera o data.aws_eks_cluster_auth depois
+
+--- iam.tf ---
+3 IAM Roles (cluster, node, karpenter) com mínimo privilégio:
+  cluster: AmazonEKSClusterPolicy + VPCResourceController
+  node: WorkerNodePolicy + CNI + ECR + SSM
+  karpenter: mesmo que node + custom policy (ec2:RunInstances, CreateFleet, etc)
+
+--- node-group.tf ---
+Node Group on-demand principal.
+Labels: node-pool=ondemand, critical=true.
+Tags para cluster-autoscaler discovery.
+Comentário: "Em DEV: min_size=1, max_size=2 para não gastar com nós ociosos"
+
+--- karpenter.tf ---
+EC2NodeClass + NodePool:
+  - AMI Family: AL2
+  - Subnet/SG discovery por tags
+  - Spot + On-Demand
+  - Limite CPU: 2 em dev, 100 em prod
+  - ConsolidationPolicy: WhenUnderutilized
+  - Subnet tags para descoberta do Karpenter
+
+--- outputs.tf ---
+cluster_id, cluster_name, cluster_endpoint, cluster_sg_id,
+ca_data, cluster_arn, karpenter_role_arn, node_role_arn, kms_key_arn
+
+================================================================================
+  MÓDULO: modules/tenant-argocd/ (9 arquivos)
+================================================================================
+
+--- variables.tf ---
+9 variáveis: tenant, environment, infra_version (dev),
+cluster_endpoint, ca_data, cluster_name, argocd_version (7.8.0),
+admin_password_hash (sensitive), domain, tags
+
+--- providers.tf ---
+Helm + Kubectl providers configurados para o cluster EKS
+
+--- version.tf ---
+Local infra_version = try(var.infra_version, "dev")
+
+--- namespace.tf ---
+Namespace argocd com labels de tenant, environment, infra-version
+Annotations com URL do repositório
+
+--- helm-release.tf ---
+Instala ArgoCD via Helm chart com values customizados
+
+--- values.yaml ---
+RBAC (admin por tenant), Ingress ALB condicional, resource limits
+
+--- applicationsets.tf (2 AppSets) ---
+1. tenant-apps: Generator GIT → pastas /tenants/* → 1 Application por tenant
+2. infra-apps: Generator LIST → ingress-nginx, cert-manager, metrics-server,
+   cluster-autoscaler, aws-load-balancer-controller
+
+--- projects.tf (2 AppProjects) ---
+1. infra: Acesso a repos Helm, namespaces específicos
+2. tenants: Namespaces *, com restrições de cluster resources
+
+--- outputs.tf ---
+namespace, server, helm_version, appset names
+
+================================================================================
+  AMBIENTE: environments/dev
+================================================================================
+
+--- main.tf (com ordem de execução explicita) ---
+"ORDEM: Apply #1 (VPC+EKS) → espera 15min → Apply #2 (Karpenter+ArgoCD)"
+terraform com 5 providers (aws, helm, kubernetes, kubectl)
+Provider kubectl configurado APÓS cluster EKS ativo
+Módulos: tenant_network → tenant_eks → tenant_argocd (depends_on)
+
+--- variables.tf ---
+tenant, environment, vpc (object), tags, enable_karpenter (true),
+argocd_domain (""), infra_version ("dev")
+
+--- outputs.tf ---
+vpc_id, subnets, nat_ids, eks_cluster_name/endpoint/arn,
+karpenter_role_arn, argocd_namespace/server
+
+--- terraform.tfvars ---
+tenant = "acme-corp"; environment = "dev"
+vpc = 10.10.0.0/16, 2 AZs, 2 pub + 2 priv subnets
+enable_nat_gateway = false (custo ZERO)
+tags: CostCenter, Project, Terraform
+
+================================================================================
+  AMBIENTES: staging e prod
+================================================================================
+
+Staging: 10.20.0.0/16, 3 AZs, NAT único, endpoints S3+DynamoDB
+Prod:    10.30.0.0/16, 3 AZs, NAT por AZ, flow logs, endpoints Interface
+
+================================================================================
+  GITHUB ACTIONS WORKFLOWS
+================================================================================
+
+--- ci-plan.yml ---
+"CI: Terraform Plan em Pull Requests"
+Trigger: PR para main (paths: environments, modules, bootstrap)
+Jobs:
+  detect-changes → matrix de ambientes
+  terraform-plan: fmt → tflint → init → validate → plan
+  Comentário automático no PR com resultado
+
+--- cd-apply.yml ---
+"CD: Terraform Apply no merge para main"
+"Dev: automático | Staging: approval manual | Prod: approval + freeze"
+Trigger: push na main
+Jobs:
+  detect-changes → matrix de ambientes
+  Configure AWS (OIDC) → init → apply → output → Slack notify
+
+--- infracost-preview.yml ---
+Trigger: PR para main
+Infracost breakdown por ambiente → comment no PR
+
+--- security-sast.yml ---
+Trigger: PR + push na main
+Jobs paralelos:
+  checkov (IaC), trivy (containers + secrets), tflint, gitleaks
+
+--- security-dast.yml ---
+Trigger: schedule semanal + manual
+Jobs paralelos:
+  kube-bench (CIS), popeye (sanidade), kubescape (NSA/CISA)
+
+--- tag-release.yml ---
+Trigger: push na main (paths específicos)
+Calcula SemVer (patch increment), gera release notes, cria tag
+
+================================================================================
+  SCRIPTS
+================================================================================
+
+--- scripts/version.sh ---
+"Uso: ./scripts/version.sh <current|next|tag>"
+Funções: get_last_tag, get_next_version, get_commit_hash
+Uso: ./scripts/version.sh next → export TF_VAR_infra_version=v1.2.4
+
+--- scripts/setup-github.sh ---
+"Prepara o repositório local para o primeiro push"
+Passos:
+  1. Verifica Git
+  2. terraform fmt -recursive
+  3. terraform validate (backend=false)
+  4. Mostra resumo com secrets necessários
+
+--- scripts/test-30min.sh (PREVISTO) ---
+Script de teste local em 30 minutos
+  bootstrap → VPC → EKS → testa → destroy
+  Custo estimado: ~$0,50
+
+================================================================================
+  DOCS
+================================================================================
+
+--- docs/github-actions-setup.md ---
+Instruções passo a passo:
+  1. Criar IAM Role (github-actions-terraform) com OIDC
+  2. Configurar secrets no GitHub (AWS_ACCOUNT_ID, SLACK, INFRACOST)
+  3. Criar Environments (dev, staging, prod) com protection rules
+  4. Testar com PR
+
+================================================================================
+  ARQUIVO: README.md (na raiz do projeto)
+================================================================================
+
+README.md separado com:
+  - Estrutura do projeto
+  - Como usar (bootstrap → environments)
+  - Decisões de arquitetura
+  - Tabela de custos por ambiente
+  - Próximos passos
+
+================================================================================
+  CHECKLIST FINAL VS JOB DESCRIPTION
+================================================================================
+
+✅ IaC architecture — Terraform module design modular
+✅ State management (S3 + DynamoDB)
+✅ Multi-tenant isolation (VPC Silo)
+✅ GitOps — ArgoCD com ApplicationSets
+✅ Multi-tenant Kubernetes (EKS)
+✅ Karpenter (Spot + On-Demand)
+✅ GitHub Actions CI/CD (plan + apply + security)
+✅ Self-service (matrix strategy + approval gates)
+✅ Agentic coding (.continuerc.json)
+✅ Observability (CloudWatch logs, Slack)
+✅ Secrets management (KMS)
+✅ Zero-trust (RBAC, AppProjects)
+✅ FinOps (Infracost, cost tags, NAT condicional)
+✅ SAST (Checkov, Trivy, Gitleaks)
+✅ DAST (kube-bench, Popeye, Kubescape)
+✅ Versionamento SemVer automático
+✅ Documentação e comentários nos pontos críticos
+
+================================================================================
+  COMO UM DEVOPS SÊNIOR PENSA
+================================================================================
+
+  1. PENSE  → Desenhe a arquitetura no papel
+  2. DEFINA → Variáveis primeiro (o contrato)
+  3. CONSTRUA → Mínimo viável, iterativamente
+  4. VALIDE  → terraform plan a cada passo
+  5. DOCUMENTE → Enquanto constrói, não depois
+  6. OTIMIZE → Custo só quando a estrutura básica funciona
+
+  "Um DevOps Sênior não é quem sabe tudo de cabeça.
+   É quem sabe as perguntas certas a fazer e como validar
+   cada passo antes de prosseguir."
+
+================================================================================
+  FIM DO ARQUIVO COMPLETO
+================================================================================

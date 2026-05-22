@@ -1,0 +1,46 @@
+variable "tenant" {
+  description = "Nome do tenant"
+  type        = string
+}
+
+variable "environment" {
+  description = "Ambiente de deploy"
+  type        = string
+}
+
+variable "vpc" {
+  description = "Configuração da VPC"
+  type = object({
+    cidr               = string
+    azs                = list(string)
+    public_subnets     = list(string)
+    private_subnets    = list(string)
+    enable_nat_gateway = optional(bool, true)
+    single_nat_gateway = optional(bool, true)
+  })
+}
+
+variable "tags" {
+  description = "Tags para aplicar nos recursos"
+  type        = map(string)
+  default     = {}
+}
+
+variable "infra_version" {
+  description = "Versão da infraestrutura (tag git) para rastreabilidade. Definir via TF_VAR_infra_version no CI"
+  type        = string
+  default     = "dev"
+}
+
+variable "enable_karpenter" {
+  description = "Habilitar Karpenter no cluster EKS"
+  type        = bool
+  default     = true
+}
+
+variable "argocd_domain" {
+  description = "Domínio para acesso ao ArgoCD (deixar vazio em dev se não tiver DNS)"
+  type        = string
+  default     = ""
+}
+

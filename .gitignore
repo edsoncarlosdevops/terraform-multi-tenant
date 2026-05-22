@@ -1,0 +1,65 @@
+# ─── Terraform ─────────────────────────────────────────────────
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform/
+.terraform.lock.hcl
+terraform.rc
+
+# ─── Infracost ────────────────────────────────────────────────
+infracost-report.html
+infracost-report.json
+
+# ─── Checkov / Trivy / TFLint ─────────────────────────────────
+checkov-results.sarif
+trivy-results.sarif
+tflint.log
+
+# ─── kube-bench / Popeye / Kubescape ──────────────────────────
+kube-bench-results.txt
+popeye-report.html
+kubescape-results.sarif
+
+# ─── Releases / Builds ─────────────────────────────────────────
+release-notes.txt
+*.zip
+*.tar.gz
+
+# ─── IDE / Editors ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ─── Secrets (nunca commitar) ──────────────────────────────────
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+.env
+.env.*
+*.secret
+secrets/
+!modules/**/values.yaml
+
+# ─── Python / Scripts ──────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ─── Logs ──────────────────────────────────────────────────────
+*.log
+/var/log/

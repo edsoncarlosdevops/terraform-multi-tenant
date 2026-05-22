@@ -1,0 +1,50 @@
+# ─── Infracost: Estimativa de custo em PRs ───────────────────
+# Comenta automaticamente o custo das mudanças propostas
+# Ajuda a equipe a tomar decisões conscientes de custo
+
+name: Infracost - Cost Estimation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  infracost:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost JSON
+        run: |
+          mkdir -p /tmp/infracost
+          for env in dev staging prod; do
+            if [ -d "environments/$env" ]; then
+              cd environments/$env
+              terraform init > /dev/null 2>&1
+              cd ../..
+              infracost breakdown --path environments/$env \
+                --format json \
+                --out-file /tmp/infracost/$env.json
+            fi
+          done
+
+      - name: Post Infracost Comment
+        uses: infracost/actions/comment@v3
+        with:
+          path: /tmp/infracost/*.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          behavior: update
