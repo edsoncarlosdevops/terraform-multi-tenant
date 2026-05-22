@@ -1,7 +1,5 @@
 # ─── AppProject para Infraestrutura Compartilhada ───────────
 resource "kubectl_manifest" "project_infra" {
-  provider = kubectl.eks
-
   yaml_body = <<YAML
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -35,8 +33,6 @@ YAML
 
 # ─── AppProject para cada Tenant (isolamento) ────────────────
 resource "kubectl_manifest" "project_tenants" {
-  provider = kubectl.eks
-
   yaml_body = <<YAML
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

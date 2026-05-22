@@ -1,26 +1,29 @@
-# ─── Providers para interagir com o cluster EKS ──────────────
-# Configurados separadamente para evitar conflito com providers
-# do ambiente que chama o módulo
+# ─── Providers necessários para o módulo ArgoCD ─────────────
+# Declaramos os providers aqui para que o Terraform saiba
+# que os recursos (kubectl_manifest, helm_release, kubernetes_namespace)
+# vêm destas fontes, não do hashicorp/kubectl (que não existe)
 
-data "aws_eks_cluster_auth" "this" {
-  name = var.cluster_name
-}
+terraform {
+  required_version = ">= 1.6"
 
-provider "helm" {
-  alias = "eks"
-
-  kubernetes {
-    host                   = var.cluster_endpoint
-    cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
-    token                  = data.aws_eks_cluster_auth.this.token
+  required_providers {
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = "~> 1.14"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.17"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.35"
+    }
   }
 }
 
-provider "kubectl" {
-  alias = "eks"
+# ─── Providers vazios ───────────────────────────────────────────
+# Os providers (helm, kubernetes, kubectl) são herdados do
+# ambiente que chama este módulo (environments/dev/main.tf)
+# Não é necessário configurar instâncias aqui.
 
-  host                   = var.cluster_endpoint
-  cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.this.token
-  load_config_file       = false
-}

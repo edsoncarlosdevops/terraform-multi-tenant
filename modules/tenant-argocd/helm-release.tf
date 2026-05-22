@@ -1,6 +1,5 @@
 # ─── Instalação do ArgoCD via Helm ───────────────────────────
 resource "helm_release" "argocd" {
-  provider = helm.eks
 
   name       = "argocd"
   repository = "https://argoproj.github.io/argo-helm"

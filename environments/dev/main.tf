@@ -117,6 +117,4 @@ module "tenant_argocd" {
   cluster_name                       = module.tenant_eks.cluster_name
   domain                             = var.argocd_domain
   tags                               = var.tags
-
-  depends_on = [module.tenant_eks]
 }
