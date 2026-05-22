@@ -1,0 +1,70 @@
+# ═══════════════════════════════════════════════════════════════
+# SECURITY WEEKLY: Roda 1x por semana (domingo)
+# ═══════════════════════════════════════════════════════════════
+# DAST pesado que nao roda em PR (muito lento):
+#   - kube-bench: CIS benchmarks
+#   - Popeye: Sanidade do cluster
+#   - Kubescape: NSA/CISA framework
+#
+# So roda se tiver cluster EKS ativo.
+# ═══════════════════════════════════════════════════════════════
+
+name: Security Weekly
+
+on:
+  schedule:
+    - cron: '0 8 * * 0'   # Domingo as 8h
+  workflow_dispatch:        # Permite rodar manualmente
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  dast:
+    name: "DAST - Cluster Scan"
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      # ─── 1. kube-bench (CIS) ──────────────────────────────
+      - name: kube-bench
+        id: kube-bench
+        continue-on-error: true
+        run: |
+          echo "### 🔒 kube-bench - CIS Benchmark" >> $GITHUB_STEP_SUMMARY
+          kubectl run kube-bench --rm -i --restart=Never \
+            --image docker.io/aquasec/kube-bench:latest \
+            --command -- kube-bench --json 2>/dev/null | \
+            jq -r '.Controls[] | .ID + " " + .Status + " " + (.total_fail|tostring)' 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "Cluster nao acessivel" >> $GITHUB_STEP_SUMMARY
+
+      # ─── 2. Popeye ────────────────────────────────────────
+      - name: Popeye
+        continue-on-error: true
+        run: |
+          kubectl run popeye --rm -i --restart=Never \
+            --image derailed/popeye:v0.21.5 \
+            --command -- popeye --save --out html 2>/dev/null || echo "Popeye nao rodou" >> $GITHUB_STEP_SUMMARY
+
+      # ─── 3. Kubescape ─────────────────────────────────────
+      - name: Kubescape
+        uses: kubescape/action@v3
+        continue-on-error: true
+        with:
+          format: sarif
+          output: kubescape-results.sarif
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: kubescape-results.sarif
+          category: kubescape

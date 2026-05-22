@@ -1,0 +1,148 @@
+# ═══════════════════════════════════════════════════════════════
+# CI: UNIFICADO — Roda em todo Pull Request
+# ═══════════════════════════════════════════════════════════════
+# Etapas em sequencia (1 pipe):
+#   1. Formatacao (terraform fmt)
+#   2. Lint (tflint)
+#   3. SAST (Checkov + Trivy + Gitleaks)
+#   4. Plan (terraform plan para cada ambiente)
+#
+# Tudo num unico workflow para simplificar.
+# ═══════════════════════════════════════════════════════════════
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - 'bootstrap/**'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  quality:
+    name: "Quality & Security"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ─── 1. Formatação ──────────────────────────────────────
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      # ─── 2. Lint ────────────────────────────────────────────
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: TFLint
+        run: |
+          tflint --init
+          tflint --format compact
+        continue-on-error: true
+
+      # ─── 3. SAST - Checkov (IaC Scan) ──────────────────────
+      - name: Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,kubernetes
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+        continue-on-error: true
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov
+
+      # ─── 4. SAST - Trivy (filesystem) ──────────────────────
+      - name: Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: 0
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+        continue-on-error: true
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+      # ─── 5. SAST - Gitleaks (secrets) ──────────────────────
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  plan:
+    name: "Terraform Plan"
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: environments/${{ matrix.environment }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: environments/${{ matrix.environment }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color
+        working-directory: environments/${{ matrix.environment }}
+        continue-on-error: true
+
+      - uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const output = `## 🤖 Plan - \`${{ matrix.environment }}\`
+            <details><summary>Show Plan</summary>
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+            </details>
+            ${{ steps.plan.outcome == 'success' && '✅ Plan succeeded' || '❌ Plan failed' }}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
