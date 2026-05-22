@@ -3,7 +3,6 @@
 # baseado em um arquivo JSON/ YAML no repositório Git
 
 resource "kubectl_manifest" "appset_tenants" {
-  provider = kubectl.eks
 
   yaml_body = <<YAML
 apiVersion: argoproj.io/v1alpha1
@@ -50,7 +49,6 @@ YAML
 # metrics-server, cluster-autoscaler, etc.
 
 resource "kubectl_manifest" "appset_infra" {
-  provider = kubectl.eks
 
   yaml_body = <<YAML
 apiVersion: argoproj.io/v1alpha1

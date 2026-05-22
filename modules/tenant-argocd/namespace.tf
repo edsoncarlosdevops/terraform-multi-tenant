@@ -1,6 +1,5 @@
 # ─── Namespace dedicado para ArgoCD ──────────────────────────
 resource "kubernetes_namespace_v1" "argocd" {
-  provider = helm.eks
 
   metadata {
     name = "argocd"
