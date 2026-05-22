@@ -1,0 +1,120 @@
+# ═══════════════════════════════════════════════════════════════
+# CD: UNIFICADO — Roda no merge para main
+# ═══════════════════════════════════════════════════════════════
+# Etapas em sequencia:
+#   1. Tag Release (versionamento SemVer)
+#   2. Terraform Apply (para ambientes alterados)
+#   3. Notificacao Slack
+# ═══════════════════════════════════════════════════════════════
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - 'bootstrap/**'
+
+permissions:
+  id-token: write
+  contents: write
+  actions: write
+
+jobs:
+  # ─── Job 1: Versionamento ──────────────────────────────────
+  version:
+    name: "Tag Release"
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.semver.outputs.new_tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate Version
+        id: semver
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
+
+          MAJOR=$(echo $LAST_TAG | cut -d. -f1 | tr -d 'v')
+          MINOR=$(echo $LAST_TAG | cut -d. -f2)
+          PATCH=$(echo $LAST_TAG | cut -d. -f3)
+
+          if [ "$LAST_TAG" = "v0.0.0" ]; then
+            echo "new_tag=v0.1.0" >> $GITHUB_OUTPUT
+          else
+            echo "new_tag=v$MAJOR.$MINOR.$((PATCH + 1))" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.semver.outputs.new_tag }} -m "Release ${{ steps.semver.outputs.new_tag }}"
+          git push origin ${{ steps.semver.outputs.new_tag }}
+
+  # ─── Job 2: Detecta mudancas e Apply ──────────────────────
+  deploy:
+    name: "Terraform Apply"
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+      fail-fast: false
+
+    environment:
+      name: ${{ matrix.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Detect Changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1...HEAD | grep "^environments/${{ matrix.environment }}/" || echo "")
+          if [ -n "$CHANGED" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS Credentials
+        if: steps.changes.outputs.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        if: steps.changes.outputs.changed == 'true'
+        run: terraform init
+        working-directory: environments/${{ matrix.environment }}
+
+      - name: Terraform Apply
+        if: steps.changes.outputs.changed == 'true'
+        id: apply
+        env:
+          TF_VAR_infra_version: ${{ needs.version.outputs.new_tag }}
+        run: terraform apply -auto-approve -no-color
+        working-directory: environments/${{ matrix.environment }}
+
+      - name: Notify Slack
+        if: steps.changes.outputs.changed == 'true' && always()
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "🚀 *Deploy* - `${{ matrix.environment }}`\nVersão: ${{ needs.version.outputs.new_tag }}\nStatus: ${{ job.status }}"
+            }
