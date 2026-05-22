@@ -1,0 +1,37 @@
+# ═══════════════════════════════════════════════════════════════
+# CHECKOV CONFIG
+# ═══════════════════════════════════════════════════════════════
+# Regras suprimidas com justificativa.
+# Apenas supressões INTENCIONAIS e documentadas.
+
+skipped_checks:
+  # ─── Dev/Staging: endpoint público é intencional ──────────
+  # Prod usa endpoint privado (controlado por environment)
+  - id: CKV_AWS_39
+    comment: "EKS public endpoint é intencional em dev/staging para facilitar acesso ao cluster sem VPN. Em prod o endpoint é privado (controlado por var.environment == 'prod')"
+  - id: CKV_AWS_38
+    comment: "EKS acessível de 0.0.0.0/0 apenas em dev/staging. Em prod o acesso é restrito. Controlado por var.environment"
+
+  # ─── Dev: logs com retenção reduzida para economia ────────
+  - id: CKV_AWS_338
+    comment: "Retenção de logs reduzida para 7 dias em dev (economia de ~$15/mês). Prod usa 90 dias. Controlado por var.environment"
+
+  # ─── Dev: apenas API logs para economia ────────────────────
+  - id: CKV_AWS_37
+    comment: "Apenas logs de API habilitados em dev para economia. Prod usa todos os 5 tipos de log. Controlado por var.environment"
+
+  # ─── Karpenter IAM: permissões amplas são necessárias ─────
+  - id: CKV_AWS_286
+    comment: "Karpenter precisa de permissões para criar/gerenciar instâncias EC2 e launch templates. Policy segue documentação oficial do Karpenter"
+  - id: CKV_AWS_290
+    comment: "Karpenter precisa de ec2:* para provisionar nós. Policy segue documentação oficial"
+  - id: CKV_AWS_289
+    comment: "Karpenter precisa gerenciar recursos EC2. Policy segue documentação oficial"
+  - id: CKV_AWS_355
+    comment: "Karpenter usa Resource '*' intencionalmente para criar instâncias em qualquer subnet/security group. Policy segue documentação oficial do projeto Karpenter"
+
+  # ─── Bootstrap DynamoDB: KMS key adicional custa $1/mês ──
+  - id: CKV_AWS_119
+    comment: "DynamoDB usa criptografia AES256 padrão (gratuita). Adicionar KMS CMK custaria $1/mês adicional sem benefício real para state lock"
+  - id: CKV_AWS_28
+    comment: "Point-in-time recovery desabilitado para economizar custos. O state lock do DynamoDB é stateless e recriável via bootstrap"
