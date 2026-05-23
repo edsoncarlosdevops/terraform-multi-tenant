@@ -431,4 +431,48 @@ Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations nos recursos
 
 ---
 
+## 🎨 Guia Visual: Desenhando no Papel (4 Passos)
+
+Se fosse desenhar esta arquitetura no papel/quadro branco, o raciocínio seria este:
+
+### Passo 1 — O Problema: Como Isolar os Tenants?
+
+<p align="center">
+  <img src="whiteboard-step1-problema.png" alt="Passo 1: O Problema" width="700">
+</p>
+
+> Antes de escrever qualquer código, defina o **modelo de isolamento**. Pool, Bridge ou Silo? Avalie os trade-offs de custo vs segurança. Neste projeto: **Silo** (VPC dedicada por tenant).
+
+---
+
+### Passo 2 — Rede: Desenhando a VPC
+
+<p align="center">
+  <img src="whiteboard-step2-rede.png" alt="Passo 2: Rede" width="700">
+</p>
+
+> Desenhe a VPC com subnets públicas e privadas. Decida: NAT sim ou não? Endpoints grátis ou pagos? **Comece SEMPRE pelas variáveis** — o contrato do módulo. 4 variáveis = contrato enxuto.
+
+---
+
+### Passo 3 — Compute + GitOps: EKS + Karpenter + ArgoCD
+
+<p align="center">
+  <img src="whiteboard-step3-compute.png" alt="Passo 3: Compute" width="700">
+</p>
+
+> Pense em camadas: VPC (base) → EKS (meio) → ArgoCD (topo). Node Group On-Demand para workloads críticas, Karpenter Spot para o resto. ApplicationSets: **nova pasta no Git = novo tenant automático**.
+
+---
+
+### Passo 4 — CI/CD + Segurança + Custos
+
+<p align="center">
+  <img src="whiteboard-step4-cicd.png" alt="Passo 4: CI/CD" width="700">
+</p>
+
+> Três pilares finais: **Pipeline** (CI em PRs, CD no merge), **Segurança em Camadas** (SAST + DAST + IAM + KMS), **FinOps** (NAT condicional, Spot, CPU limits). Dev pode ser $0 quando destruído.
+
+---
+
 [← Voltar ao README principal](../../README.md)
