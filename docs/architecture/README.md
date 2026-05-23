@@ -8,6 +8,10 @@
 
 Este documento explica as **decisões de design** por trás do projeto. Cada decisão inclui: o problema, as alternativas avaliadas, a escolha feita e a justificativa.
 
+<p align="center">
+  <img src="architecture-diagram.png" alt="Diagrama de Arquitetura" width="800">
+</p>
+
 ---
 
 ## 1. Modelo Multi-Tenant: Silo (VPC Dedicada)

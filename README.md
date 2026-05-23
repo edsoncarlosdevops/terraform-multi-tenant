@@ -13,6 +13,10 @@
   <b>Infraestrutura SaaS production-ready com isolamento total por tenant, GitOps, escalonamento inteligente e segurança em camadas.</b>
 </p>
 
+<p align="center">
+  <img src="docs/architecture/architecture-diagram.png" alt="Diagrama de Arquitetura" width="900">
+</p>
+
 ---
 
 ## 📑 Índice
