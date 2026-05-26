@@ -91,9 +91,9 @@ YAML
 # ─── Tags nas subnets para o Karpenter descobrir ────────────
 # Sem isso, o Karpenter nao sabe em quais subnets criar os nodes
 resource "aws_ec2_tag" "karpenter_subnets" {
-  for_each = toset(var.private_subnet_ids)
+  for_each = { for idx, subnet_id in var.private_subnet_ids : idx => subnet_id }
 
-  resource_id = each.key
+  resource_id = each.value
   key         = "karpenter.sh/discovery"
   value       = local.name_prefix
 }

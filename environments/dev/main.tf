@@ -106,6 +106,7 @@ module "tenant_eks" {
 # - Versionamento (infra_version) nos labels
 #
 # Depende do EKS estar operacional (wait_for_cluster)
+# IMPORTANTE: depends_on no node group garante que os nodes estao READY
 module "tenant_argocd" {
   source = "../../modules/tenant-argocd"
 
@@ -117,4 +118,8 @@ module "tenant_argocd" {
   cluster_name                       = module.tenant_eks.cluster_name
   domain                             = var.argocd_domain
   tags                               = var.tags
+
+  depends_on = [
+    module.tenant_eks
+  ]
 }
