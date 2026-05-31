@@ -96,7 +96,7 @@ This project implements a **complete SaaS multi-tenant infrastructure on AWS** u
    │  + ArgoCD       │    │  + ArgoCD            │   │   + ArgoCD            │
    │  CPU limit: 2   │    │  CPU limit: 100      │   │   CPU limit: 100      │
    │  Logs: api only │    │  Logs: api only      │   │   Logs: full (5 types)│
-   │  KMS:         │    │  KMS:               │   │   KMS:  + Flow Logs │
+   │  KMS: ✅        │    │  KMS: ✅              │   │   KMS: ✅ + Flow Logs │
    └─────────────────┘    └─────────────────────-┘   └──────────────────────-┘
 ```
 
@@ -312,15 +312,15 @@ Each project component has its own detailed documentation:
 | **CIDR** | `10.10.0.0/16` | `10.20.0.0/16` | `10.30.0.0/16` |
 | **AZs** | 2 | 3 | 3 |
 | **Subnets (pub + priv)** | 2 + 2 | 3 + 3 | 3 + 3 |
-| **NAT Gateway** |  1 (single) |  1 (single) |  3 (1 per AZ) |
-| **VPC Endpoints Gateway** |  S3 + DynamoDB |  S3 + DynamoDB |  S3 + DynamoDB |
-| **VPC Endpoints Interface** |  |  |  ECR + Logs |
-| **Flow Logs** |  |  |  (90 days) |
+| **NAT Gateway** | ✅ 1 (single) | ✅ 1 (single) | ✅ 3 (1 per AZ) |
+| **VPC Endpoints Gateway** | ✅ S3 + DynamoDB | ✅ S3 + DynamoDB | ✅ S3 + DynamoDB |
+| **VPC Endpoints Interface** | ❌ | ❌ | ✅ ECR + Logs |
+| **Flow Logs** | ❌ | ❌ |  (90 days) |
 | **EKS Endpoint** | Public | Public | Private |
 | **EKS Logs** | `api` | `api` | 5 types (full) |
 | **CloudWatch Retention** | 7 days | 7 days | 90 days |
 | **Karpenter CPU Limit** | 2 vCPU | 100 vCPU | 100 vCPU |
-| **KMS Encryption** |  |  |  |
+| **KMS Encryption** | ✅ | ✅ | ✅ |
 | **CD Deploy** | Automatic | Manual approval | Approval + Freeze |
 | **Estimated cost/mo** | ~$108 | ~$150 | ~$500+ |
 
