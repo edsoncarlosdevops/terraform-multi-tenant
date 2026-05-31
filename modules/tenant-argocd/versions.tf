@@ -1,4 +1,4 @@
-# ─── Versionamento do Estado da Infraestrutura ───────────────
+#  Versionamento do Estado da Infraestrutura 
 # Adiciona metadata de versão nos recursos do ArgoCD
 # Permite rastrear qual tag do repositório criou cada recurso
 

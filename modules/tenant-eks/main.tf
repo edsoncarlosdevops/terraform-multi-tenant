@@ -4,7 +4,7 @@ locals {
   name_prefix = "${var.tenant}-${var.environment}"
 }
 
-# ─── Cluster EKS ──────────────────────────────────────────────
+#  Cluster EKS 
 resource "aws_eks_cluster" "this" {
   name     = "${local.name_prefix}-eks"
   role_arn = aws_iam_role.cluster.arn
@@ -40,7 +40,7 @@ resource "aws_eks_cluster" "this" {
   ]
 }
 
-# ─── KMS Key para criptografia dos secrets do EKS ────────────
+#  KMS Key para criptografia dos secrets do EKS 
 resource "aws_kms_key" "eks" {
   description         = "EKS Secret Encryption Key - ${local.name_prefix}"
   enable_key_rotation = true
@@ -55,7 +55,7 @@ resource "aws_kms_alias" "eks" {
   target_key_id = aws_kms_key.eks.key_id
 }
 
-# ─── CloudWatch Logs para EKS ────────────────────────────────
+#  CloudWatch Logs para EKS 
 resource "aws_cloudwatch_log_group" "eks" {
   name              = "/aws/eks/${local.name_prefix}-eks/cluster"
   retention_in_days = var.environment == "prod" ? 90 : 7
@@ -63,7 +63,7 @@ resource "aws_cloudwatch_log_group" "eks" {
   tags = var.tags
 }
 
-# ─── Security Group do Cluster ───────────────────────────────
+#  Security Group do Cluster 
 resource "aws_security_group" "cluster" {
   name        = "${local.name_prefix}-eks-cluster-sg"
   description = "Security group for EKS cluster control plane"

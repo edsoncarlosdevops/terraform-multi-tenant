@@ -1,4 +1,4 @@
-# ─── VPC Flow Logs (Auditoria/Segurança) ───────────────────────
+#  VPC Flow Logs (Auditoria/Segurança) 
 # Apenas em produção para reduzir custos
 
 resource "aws_cloudwatch_log_group" "flow_logs" {
@@ -29,7 +29,7 @@ resource "aws_flow_log" "this" {
   })
 }
 
-# ─── IAM Role para Flow Logs ────────────────────────────────────
+#  IAM Role para Flow Logs 
 resource "aws_iam_role" "flow_logs" {
   count = var.environment == "prod" ? 1 : 0
 

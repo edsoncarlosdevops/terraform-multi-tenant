@@ -1,5 +1,5 @@
-# ─── VPC Endpoints para serviços AWS (economia de custo) ────────
-# Evita tráfego via NAT Gateway → reduz custos de dados transferidos
+#  VPC Endpoints para serviços AWS (economia de custo) 
+# Evita tráfego via NAT Gateway -> reduz custos de dados transferidos
 
 resource "aws_vpc_endpoint" "s3" {
   vpc_id       = aws_vpc.this.id

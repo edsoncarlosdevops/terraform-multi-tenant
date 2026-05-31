@@ -18,7 +18,7 @@ output "nat_gateway_ids" {
   value       = module.tenant_network.nat_gateway_ids
 }
 
-# ─── EKS ───────────────────────────────────────────────────────
+#  EKS 
 output "eks_cluster_name" {
   description = "Nome do cluster EKS"
   value       = module.tenant_eks.cluster_name
@@ -49,7 +49,7 @@ output "kms_key_arn" {
   value       = module.tenant_eks.kms_key_arn
 }
 
-# ─── Karpenter ─────────────────────────────────────────────────
+#  Karpenter 
 output "karpenter_role_arn" {
   description = "ARN da role EC2 do Karpenter (para os nodes que ele cria)"
   value       = module.tenant_eks.karpenter_role_arn
@@ -60,7 +60,7 @@ output "karpenter_controller_role_arn" {
   value       = module.tenant_eks.karpenter_controller_role_arn
 }
 
-# ─── ArgoCD ────────────────────────────────────────────────────
+#  ArgoCD 
 output "argocd_namespace" {
   description = "Namespace do ArgoCD"
   value       = module.tenant_argocd.argocd_namespace

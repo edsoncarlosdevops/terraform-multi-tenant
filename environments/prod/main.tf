@@ -1,14 +1,14 @@
-# ═══════════════════════════════════════════════════════════════
+# 
 # AMBIENTE: PROD
-# ═══════════════════════════════════════════════════════════════
+# 
 # Orquestra a criacao completa do ambiente multi-tenant.
 #
 # ORDEM DE EXECUCAO (automatica via depends_on):
-#   1. tenant_network  → VPC, subnets, NAT (HA por AZ)
-#   2. tenant_eks      → Cluster EKS, node group, IAM roles
-#   3. karpenter.tf    → Helm + manifests (se enable_karpenter)
-#   4. tenant_argocd   → ArgoCD via Helm
-# ═══════════════════════════════════════════════════════════════
+#   1. tenant_network  -> VPC, subnets, NAT (HA por AZ)
+#   2. tenant_eks      -> Cluster EKS, node group, IAM roles
+#   3. karpenter.tf    -> Helm + manifests (se enable_karpenter)
+#   4. tenant_argocd   -> ArgoCD via Helm
+# 
 
 terraform {
   required_version = ">= 1.6"
@@ -61,7 +61,7 @@ provider "aws" {
   }
 }
 
-# ─── Módulo de Rede ──────────────────────────────────────────
+#  Módulo de Rede 
 module "tenant_network" {
   source = "../../modules/tenant-network"
 
@@ -71,7 +71,7 @@ module "tenant_network" {
   tags        = var.tags
 }
 
-# ─── Módulo EKS ──────────────────────────────────────────────
+#  Módulo EKS 
 module "tenant_eks" {
   source = "../../modules/tenant-eks"
 
@@ -83,10 +83,10 @@ module "tenant_eks" {
   tags               = var.tags
 }
 
-# ─── Karpenter (Helm + Manifests) ────────────────────────────
+#  Karpenter (Helm + Manifests) 
 # Ver karpenter.tf para detalhes
 
-# ─── ArgoCD ──────────────────────────────────────────────────
+#  ArgoCD 
 module "tenant_argocd" {
   source = "../../modules/tenant-argocd"
 

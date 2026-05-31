@@ -1,16 +1,44 @@
-# ─── Values customizados para o Helm Chart do ArgoCD ─────────
-# Adaptados por ambiente e tenant
+# ================================================================
+# ARGOCD: Custom values for Helm Chart
+# ================================================================
+# This file is rendered by Terraform templatefile().
+# Variables $${...} are substituted by the template engine.
+#
+# IMPORTANT: During terraform destroy, ArgoCD ApplicationSets
+# and Applications create finalizers that block namespace deletion.
+# If stuck in Terminating state, run manually:
+#   kubectl patch application -n argocd <name> -p '{"metadata":{"finalizers":[]}}' --type=merge
+#   kubectl patch applicationset -n argocd <name> -p '{"metadata":{"finalizers":[]}}' --type=merge
+#
+# COST: ArgoCD is free (open source). The ALB for ingress costs
+# ~$20/month. In dev, we use port-forward (domain="").
+# ================================================================
 
 global:
   domain: ${domain}
 
+# --- ArgoCD Configuration --------------------------------------
 configs:
   params:
+    # Enable HTTP (not HTTPS) on server - ALB handles SSL
     server.insecure: true
+    # Keep auto-sync enabled for GitOps workflow
+    controller.disable.auto.sync: false
+    # Status processors - increases concurrency
+    controller.status.processors: 20
+    # Operation processors (sync/rollback)
+    controller.operation.processors: 10
   cm:
     admin.enabled: true
+    # Reconciliation timeout: 60s
+    # Lower values (10s) = more cluster load
+    # Higher values (5min) = apps take longer to sync
     timeout.reconciliation: 60s
+    # Enable status badges in Git repos
     statusbadge.enabled: true
+    # --- Ignore CA Bundle differences --------------------------
+    # cert-manager and ingress-nginx webhooks change caBundle
+    # automatically. Without this, ArgoCD sees perpetual drift.
     resource.customizations: |
       admissionregistration.k8s.io/MutatingWebhookConfiguration:
         ignoreDifferences: |
@@ -21,6 +49,11 @@ configs:
           jsonPointers:
           - /webhooks/0/clientConfig/caBundle
   rbac:
+    # --- RBAC: Access Control ----------------------------------
+    # policy.default: role:readonly -> any user can view
+    # policy.csv: defines groups and permissions
+    #   $${tenant}-admin = full admin (via GitHub OIDC)
+    # scopes: '[groups]' -> gets groups from OIDC (Azure AD / GitHub)
     policy.default: role:readonly
     policy.csv: |
       p, role:admin, applications, *, */*, allow
@@ -32,12 +65,18 @@ configs:
       g, ${tenant}-admin, role:admin
     scopes: '[groups]'
 
+# --- Server / Ingress ------------------------------------------
 server:
   ingress:
+    # Only create ingress if domain is not empty
+    # In dev (domain="") we access via port-forward
+    # In staging/prod, domain="argocd.acme-corp.com"
     enabled: ${domain != ""}
     hosts:
       - ${domain}
     annotations:
+      # Uses ALB (AWS Load Balancer) for SSL termination
+      # Costs ~$20/month even without traffic
       kubernetes.io/ingress.class: alb
       alb.ingress.kubernetes.io/scheme: internet-facing
       alb.ingress.kubernetes.io/target-type: ip
@@ -45,6 +84,11 @@ server:
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/tags: >-
         Tenant=${tenant},Environment=${environment},ManagedBy=terraform
+
+# --- Resource Requests / Limits ---------------------------------
+# Adjust based on workload:
+#   Dev: minimum values (current)
+#   Prod: may need 2x if many apps/tenants
 
 repoServer:
   resources:

@@ -1,4 +1,4 @@
-# ─── ApplicationSet Multi-Tenant ─────────────────────────────
+#  ApplicationSet Multi-Tenant 
 # Cria um ApplicationSet que gera Applications para cada tenant
 # baseado em um arquivo JSON/ YAML no repositório Git
 
@@ -44,7 +44,7 @@ YAML
   depends_on = [helm_release.argocd]
 }
 
-# ─── ApplicationSet para Infraestrutura Base ─────────────────
+#  ApplicationSet para Infraestrutura Base 
 # Instala componentes compartilhados: ingress-nginx, cert-manager,
 # metrics-server, cluster-autoscaler, etc.
 

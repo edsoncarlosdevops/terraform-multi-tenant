@@ -1,4 +1,4 @@
-# ─── Subnets Públicas ───────────────────────────────────────────
+#  Subnets Públicas 
 resource "aws_subnet" "public" {
   count = length(var.vpc.public_subnets)
 
@@ -15,7 +15,7 @@ resource "aws_subnet" "public" {
   })
 }
 
-# ─── Subnets Privadas ──────────────────────────────────────────
+#  Subnets Privadas 
 resource "aws_subnet" "private" {
   count = length(var.vpc.private_subnets)
 

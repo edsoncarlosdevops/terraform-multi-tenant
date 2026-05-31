@@ -1,23 +1,23 @@
-# 🌍 Environments — Dev, Staging e Prod
+#  Environments — Dev, Staging e Prod
 
-[← Voltar ao README principal](../../README.md)
+[<- Voltar ao README principal](../../README.md)
 
 ---
 
-## 📋 Visão Geral
+##  Visão Geral
 
 Os environments são as **instanciações concretas** dos módulos. Cada environment chama os módulos reutilizáveis (`tenant-network`, `tenant-eks`, `tenant-argocd`) com parâmetros específicos para o ambiente.
 
 ```
 environments/
-├── dev/            ← Custo mínimo, desenvolvimento rápido
-├── staging/        ← Balanceado, validação antes de prod
-└── prod/           ← Alta disponibilidade, segurança máxima
+ dev/            <- Custo mínimo, desenvolvimento rápido
+ staging/        <- Balanceado, validação antes de prod
+ prod/           <- Alta disponibilidade, segurança máxima
 ```
 
 ---
 
-## 📐 Comparativo Completo
+##  Comparativo Completo
 
 | Característica | Dev | Staging | Prod |
 |:--------------|:---:|:-------:|:----:|
@@ -26,13 +26,13 @@ environments/
 | **AZs** | 2 (`1a`, `1b`) | 3 (`1a`, `1b`, `1c`) | 3 (`1a`, `1b`, `1c`) |
 | **Subnets Públicas** | 2 | 3 | 3 |
 | **Subnets Privadas** | 2 | 3 | 3 |
-| **NAT Gateway** | ❌ Desabilitado | ✅ 1 (single) | ✅ 3 (1 por AZ) |
-| **VPC Endpoints Gateway** | ✅ S3 + DynamoDB | ✅ S3 + DynamoDB | ✅ S3 + DynamoDB |
-| **VPC Endpoints Interface** | ❌ | ❌ | ✅ ECR + Logs |
-| **Flow Logs** | ❌ | ❌ | ✅ (90 dias) |
-| **EKS Cluster** | ✅ | ❌ (apenas network) | ❌ (apenas network) |
-| **Karpenter** | ✅ (CPU limit: 2) | — | — |
-| **ArgoCD** | ✅ | — | — |
+| **NAT Gateway** |  Desabilitado |  1 (single) |  3 (1 por AZ) |
+| **VPC Endpoints Gateway** |  S3 + DynamoDB |  S3 + DynamoDB |  S3 + DynamoDB |
+| **VPC Endpoints Interface** |  |  |  ECR + Logs |
+| **Flow Logs** |  |  |  (90 dias) |
+| **EKS Cluster** |  |  (apenas network) |  (apenas network) |
+| **Karpenter** |  (CPU limit: 2) | — | — |
+| **ArgoCD** |  | — | — |
 | **Backend S3 key** | `environments/dev/` | `environments/staging/` | `environments/prod/` |
 | **CD Deploy** | Automático | Approval manual | Approval + freeze |
 | **Custo estimado** | ~$75/mês | ~$40/mês (só rede) | ~$140/mês (só rede) |
@@ -41,7 +41,7 @@ environments/
 
 ---
 
-## 🟢 Ambiente: Dev
+##  Ambiente: Dev
 
 ### Filosofia
 > "Custo mínimo, iteração rápida. Sem NAT = $0 em rede."
@@ -53,13 +53,13 @@ environments/
 O `main.tf` do dev é o mais completo — orquestra os 3 módulos:
 
 ```hcl
-# ═══════════════════════════════════════════════════
+# 
 # ORDEM DE EXECUÇÃO RECOMENDADA:
 #   Apply #1: terraform apply -target=module.tenant_network \
 #                              -target=module.tenant_eks
 #   ⏳ Aguarda ~15 min o cluster EKS ficar ACTIVE
 #   Apply #2: terraform apply (instala Karpenter + ArgoCD)
-# ═══════════════════════════════════════════════════
+# 
 
 terraform {
   backend "s3" {
@@ -80,7 +80,7 @@ provider "kubectl" {
 }
 
 # Cadeia de dependências:
-# tenant_network → tenant_eks → tenant_argocd
+# tenant_network -> tenant_eks -> tenant_argocd
 module "tenant_network" { ... }
 module "tenant_eks"     { ... }     # Depende de network
 module "tenant_argocd"  { ... }     # Depende de EKS
@@ -103,7 +103,7 @@ vpc = {
   azs                = ["us-east-1a", "us-east-1b"]
   public_subnets     = ["10.10.1.0/24", "10.10.2.0/24"]
   private_subnets    = ["10.10.10.0/24", "10.10.11.0/24"]
-  enable_nat_gateway = false    # ← SEM NAT: custo zero de rede
+  enable_nat_gateway = false    # <- SEM NAT: custo zero de rede
   single_nat_gateway = true
 }
 
@@ -125,7 +125,7 @@ tags = {
 
 ---
 
-## 🟡 Ambiente: Staging
+##  Ambiente: Staging
 
 ### Filosofia
 > "Balanceado: 1 NAT para acesso internet das subnets privadas. Validação antes de prod."
@@ -160,11 +160,11 @@ environment = "staging"
 
 vpc = {
   cidr               = "10.20.0.0/16"
-  azs                = ["us-east-1a", "us-east-1b", "us-east-1c"]    # ← 3 AZs
+  azs                = ["us-east-1a", "us-east-1b", "us-east-1c"]    # <- 3 AZs
   public_subnets     = ["10.20.1.0/24", "10.20.2.0/24", "10.20.3.0/24"]
   private_subnets    = ["10.20.10.0/24", "10.20.11.0/24", "10.20.12.0/24"]
   enable_nat_gateway = true
-  single_nat_gateway = true     # ← Apenas 1 NAT (economia)
+  single_nat_gateway = true     # <- Apenas 1 NAT (economia)
 }
 
 tags = {
@@ -177,7 +177,7 @@ tags = {
 
 ---
 
-## 🔴 Ambiente: Prod
+##  Ambiente: Prod
 
 ### Filosofia
 > "Alta disponibilidade total. NAT por AZ, flow logs, endpoints Interface. Sem compromissos."
@@ -216,7 +216,7 @@ vpc = {
   public_subnets     = ["10.30.1.0/24", "10.30.2.0/24", "10.30.3.0/24"]
   private_subnets    = ["10.30.10.0/24", "10.30.11.0/24", "10.30.12.0/24"]
   enable_nat_gateway = true
-  single_nat_gateway = false    # ← NAT por AZ para HA
+  single_nat_gateway = false    # <- NAT por AZ para HA
 }
 ```
 
@@ -232,27 +232,27 @@ output "vpc_flow_log_group" {
 
 ---
 
-## 📐 Mapa de CIDRs
+##  Mapa de CIDRs
 
 ```
                     10.0.0.0/8 (Espaço privado)
-                         │
-    ┌────────────────────┼────────────────────┐
-    │                    │                    │
+                         
+    
+                                            
 10.10.0.0/16         10.20.0.0/16        10.30.0.0/16
     DEV                STAGING              PROD
-    │                    │                    │
-┌───┴───┐          ┌─────┴─────┐        ┌─────┴─────┐
-│Public │          │ Public    │        │ Public    │
-│.1.0   │          │ .1.0      │        │ .1.0      │
-│.2.0   │          │ .2.0      │        │ .2.0      │
-│       │          │ .3.0      │        │ .3.0      │
-├───────┤          ├───────────┤        ├───────────┤
-│Private│          │ Private   │        │ Private   │
-│.10.0  │          │ .10.0     │        │ .10.0     │
-│.11.0  │          │ .11.0     │        │ .11.0     │
-│       │          │ .12.0     │        │ .12.0     │
-└───────┘          └───────────┘        └───────────┘
+                                            
+                  
+Public            Public             Public    
+.1.0              .1.0               .1.0      
+.2.0              .2.0               .2.0      
+                  .3.0               .3.0      
+                  
+Private           Private            Private   
+.10.0             .10.0              .10.0     
+.11.0             .11.0              .11.0     
+                  .12.0              .12.0     
+                  
 ```
 
 **Por que CIDRs separados?**
@@ -262,7 +262,7 @@ output "vpc_flow_log_group" {
 
 ---
 
-## 🚀 Como Expandir Staging/Prod
+##  Como Expandir Staging/Prod
 
 Para adicionar EKS + ArgoCD em staging/prod, siga o padrão do dev:
 
@@ -310,7 +310,7 @@ module "tenant_argocd" {
 
 ---
 
-## 🧠 Conceitos para Estudar
+##  Conceitos para Estudar
 
 | Conceito | O que é | Relevância |
 |---------|---------|-----------|
@@ -324,4 +324,4 @@ module "tenant_argocd" {
 
 ---
 
-[← Voltar ao README principal](../../README.md)
+[<- Voltar ao README principal](../../README.md)

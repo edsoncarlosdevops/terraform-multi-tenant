@@ -1,15 +1,15 @@
-# ═══════════════════════════════════════════════════════════════
+# 
 # KARPENTER: Instalação via Helm + Manifests de Configuração
-# ═══════════════════════════════════════════════════════════════
+# 
 # Instala o controller do Karpenter via Helm e configura
 # EC2NodeClass e NodePool com APIs v1.
-# ═══════════════════════════════════════════════════════════════
+# 
 
 locals {
   karpenter_name_prefix = "${var.tenant}-${var.environment}"
 }
 
-# ─── CRDs do Karpenter ────────────────────────────────────────
+#  CRDs do Karpenter 
 resource "helm_release" "karpenter_crds" {
   count      = var.enable_karpenter ? 1 : 0
   name       = "karpenter-crd"
@@ -24,14 +24,14 @@ resource "helm_release" "karpenter_crds" {
   depends_on = [module.tenant_eks]
 }
 
-# ─── Aguarda nodes ficarem Ready ──────────────────────────────
+#  Aguarda nodes ficarem Ready 
 resource "time_sleep" "wait_nodes_ready" {
   count      = var.enable_karpenter ? 1 : 0
   depends_on = [module.tenant_eks]
   create_duration = "30s"
 }
 
-# ─── Controller do Karpenter ──────────────────────────────────
+#  Controller do Karpenter 
 resource "helm_release" "karpenter" {
   count      = var.enable_karpenter ? 1 : 0
   name       = "karpenter"
@@ -69,14 +69,14 @@ resource "helm_release" "karpenter" {
   ]
 }
 
-# ─── Aguarda controller ficar pronto ──────────────────────────
+#  Aguarda controller ficar pronto 
 resource "time_sleep" "wait_karpenter" {
   count      = var.enable_karpenter ? 1 : 0
   depends_on = [helm_release.karpenter[0]]
   create_duration = "15s"
 }
 
-# ─── EC2NodeClass: define tipo de máquina ─────────────────────
+#  EC2NodeClass: define tipo de máquina 
 resource "kubectl_manifest" "karpenter_node_class" {
   count = var.enable_karpenter ? 1 : 0
 
@@ -108,7 +108,7 @@ YAML
   ]
 }
 
-# ─── NodePool: regras de escalonamento ────────────────────────
+#  NodePool: regras de escalonamento 
 resource "kubectl_manifest" "karpenter_node_pool" {
   count = var.enable_karpenter ? 1 : 0
 

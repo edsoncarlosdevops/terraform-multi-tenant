@@ -1,4 +1,4 @@
-# ─── Node Group Principal (On-Demand) ─────────────────────────
+#  Node Group Principal (On-Demand) 
 # Usado para workloads críticas que não devem ser interrompidas
 # O Karpenter gerencia o restante (spot, scaling dinâmico)
 

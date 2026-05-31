@@ -1,4 +1,4 @@
-# ─── AppProject para Infraestrutura Compartilhada ───────────
+#  AppProject para Infraestrutura Compartilhada 
 resource "kubectl_manifest" "project_infra" {
   yaml_body = <<YAML
 apiVersion: argoproj.io/v1alpha1
@@ -31,7 +31,7 @@ YAML
   depends_on = [helm_release.argocd]
 }
 
-# ─── AppProject para cada Tenant (isolamento) ────────────────
+#  AppProject para cada Tenant (isolamento) 
 resource "kubectl_manifest" "project_tenants" {
   yaml_body = <<YAML
 apiVersion: argoproj.io/v1alpha1

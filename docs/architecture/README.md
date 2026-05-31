@@ -1,10 +1,10 @@
-# 🏛️ Decisões de Arquitetura
+#  Decisões de Arquitetura
 
-[← Voltar ao README principal](../../README.md)
+[<- Voltar ao README principal](../../README.md)
 
 ---
 
-## 📋 Visão Geral
+##  Visão Geral
 
 Este documento explica as **decisões de design** por trás do projeto. Cada decisão inclui: o problema, as alternativas avaliadas, a escolha feita e a justificativa.
 
@@ -24,9 +24,9 @@ Como isolar tenants em uma plataforma SaaS na AWS?
 
 | Modelo | Descrição | Isolamento | Custo | Complexidade |
 |--------|-----------|:----------:|:-----:|:------------:|
-| **Pool** | Todos os tenants na mesma VPC, separados por namespace | 🟡 Baixo | 💚 Mínimo | 🟡 Médio |
-| **Bridge** | VPC compartilhada com subnets separadas por tenant | 🟡 Médio | 🟡 Médio | 🟡 Médio |
-| **Silo** | VPC dedicada por tenant | 🟢 Total | 🔴 Alto | 🟢 Simples |
+| **Pool** | Todos os tenants na mesma VPC, separados por namespace |  Baixo |  Mínimo |  Médio |
+| **Bridge** | VPC compartilhada com subnets separadas por tenant |  Médio |  Médio |  Médio |
+| **Silo** | VPC dedicada por tenant |  Total |  Alto |  Simples |
 
 ### Escolha: **Silo**
 
@@ -40,9 +40,9 @@ Como isolar tenants em uma plataforma SaaS na AWS?
 
 ### Trade-offs
 
-- ❌ Custo mais alto (cada VPC tem seus NATs, endpoints, etc)
-- ❌ Mais recursos para gerenciar
-- ✅ Mitigado pela otimização por ambiente (dev sem NAT = $0)
+-  Custo mais alto (cada VPC tem seus NATs, endpoints, etc)
+-  Mais recursos para gerenciar
+-  Mitigado pela otimização por ambiente (dev sem NAT = $0)
 
 ---
 
@@ -66,22 +66,22 @@ Como organizar arquivos Terraform sem que o `main.tf` fique com 500+ linhas?
 
 ```
 modules/tenant-network/
-├── main.tf           # VPC + IGW (36 linhas)
-├── subnets.tf        # Subnets pub + priv (33 linhas)
-├── nat-gateway.tf    # EIP + NAT (29 linhas)
-├── routing.tf        # Route tables + associações (53 linhas)
-├── endpoints.tf      # VPC Endpoints (105 linhas)
-├── flow-logs.tf      # Flow Logs + IAM (80 linhas)
-├── variables.tf      # 4 variáveis (29 linhas)
-└── outputs.tf        # 8 outputs (33 linhas)
+ main.tf           # VPC + IGW (36 linhas)
+ subnets.tf        # Subnets pub + priv (33 linhas)
+ nat-gateway.tf    # EIP + NAT (29 linhas)
+ routing.tf        # Route tables + associações (53 linhas)
+ endpoints.tf      # VPC Endpoints (105 linhas)
+ flow-logs.tf      # Flow Logs + IAM (80 linhas)
+ variables.tf      # 4 variáveis (29 linhas)
+ outputs.tf        # 8 outputs (33 linhas)
 ```
 
 ### Justificativa
 
-- **Máximo ~105 linhas por arquivo** → Facilita code review
-- **Nome do arquivo = responsabilidade** → Sabe onde procurar
-- **Minimiza conflitos em Git** → Times paralelos editam arquivos diferentes
-- **Facilita onboarding** → Novo dev entende a estrutura imediatamente
+- **Máximo ~105 linhas por arquivo** -> Facilita code review
+- **Nome do arquivo = responsabilidade** -> Sabe onde procurar
+- **Minimiza conflitos em Git** -> Times paralelos editam arquivos diferentes
+- **Facilita onboarding** -> Novo dev entende a estrutura imediatamente
 
 ---
 
@@ -107,7 +107,7 @@ variable "vpc" {
     azs                = list(string)
     public_subnets     = list(string)
     private_subnets    = list(string)
-    enable_nat_gateway = optional(bool, true)    # ← Default inteligente
+    enable_nat_gateway = optional(bool, true)    # <- Default inteligente
     single_nat_gateway = optional(bool, true)
   })
 }
@@ -116,10 +116,10 @@ variable "vpc" {
 ### Justificativa
 
 - **4 variáveis no módulo network** (vs 15+ no modelo flat)
-- **Agrupamento semântico** → Todas as configs de VPC ficam juntas
-- **Defaults inteligentes** → `optional(bool, true)` = funciona sem configurar
-- **Tipagem forte** → Erro em tempo de `plan`, não de `apply`
-- **Autocomplete** → IDEs mostram os campos do object
+- **Agrupamento semântico** -> Todas as configs de VPC ficam juntas
+- **Defaults inteligentes** -> `optional(bool, true)` = funciona sem configurar
+- **Tipagem forte** -> Erro em tempo de `plan`, não de `apply`
+- **Autocomplete** -> IDEs mostram os campos do object
 
 ---
 
@@ -139,17 +139,17 @@ count = var.vpc.enable_nat_gateway ? (
 
 | Ambiente | NAT | Custo estimado |
 |---------|:---:|:--------------:|
-| Dev | ❌ (0 NATs) | $0/mês |
-| Staging | ✅ (1 NAT) | ~$32/mês |
-| Prod | ✅ (3 NATs) | ~$96/mês |
+| Dev |  (0 NATs) | $0/mês |
+| Staging |  (1 NAT) | ~$32/mês |
+| Prod |  (3 NATs) | ~$96/mês |
 
 ### Impacto em Dev
 
 Sem NAT, recursos em subnets privadas **não acessam a internet**. Consequências:
-- ❌ Pods não podem puxar imagens de registries públicos
-- ❌ Nodes não podem baixar atualizações
-- ✅ VPC Endpoints Gateway (S3, DynamoDB) continuam funcionando
-- ✅ Para testes básicos com EKS, funciona
+-  Pods não podem puxar imagens de registries públicos
+-  Nodes não podem baixar atualizações
+-  VPC Endpoints Gateway (S3, DynamoDB) continuam funcionando
+-  Para testes básicos com EKS, funciona
 
 ### Quando habilitar NAT em dev?
 
@@ -167,16 +167,16 @@ VPC Endpoints Interface custam ~$7-20/mês cada. Em dev/staging, não se justifi
 
 | Endpoint | Tipo | Dev | Staging | Prod | Custo |
 |---------|------|:---:|:-------:|:----:|:-----:|
-| S3 | Gateway | ✅ | ✅ | ✅ | $0 |
-| DynamoDB | Gateway | ✅ | ✅ | ✅ | $0 |
-| ECR API | Interface | ❌ | ❌ | ✅ | ~$7/mês |
-| ECR Docker | Interface | ❌ | ❌ | ✅ | ~$7/mês |
-| CloudWatch Logs | Interface | ❌ | ❌ | ✅ | ~$7/mês |
+| S3 | Gateway |  |  |  | $0 |
+| DynamoDB | Gateway |  |  |  | $0 |
+| ECR API | Interface |  |  |  | ~$7/mês |
+| ECR Docker | Interface |  |  |  | ~$7/mês |
+| CloudWatch Logs | Interface |  |  |  | ~$7/mês |
 
 ### Justificativa
 
-- **Gateway Endpoints são GRÁTIS** → Sempre habilitados
-- **Interface Endpoints são pagos** → Só em prod onde segurança e performance são críticas
+- **Gateway Endpoints são GRÁTIS** -> Sempre habilitados
+- **Interface Endpoints são pagos** -> Só em prod onde segurança e performance são críticas
 - Em prod, ECR endpoints evitam que pull de imagens passe pelo NAT (economia de $0.045/GB)
 - Em prod, Logs endpoint garante que logs cheguem mesmo sem internet
 
@@ -192,19 +192,19 @@ Como escalar nodes automaticamente no EKS?
 
 | Ferramenta | Abordagem | Speed | Custo |
 |-----------|-----------|:-----:|:-----:|
-| **Cluster Autoscaler** | Reage a pods pending, adiciona nodes do ASG | 🟡 ~2-5 min | 🟡 |
-| **Karpenter** | Avalia workloads, provisiona instâncias otimizadas | 🟢 ~30s-1 min | 🟢 |
+| **Cluster Autoscaler** | Reage a pods pending, adiciona nodes do ASG |  ~2-5 min |  |
+| **Karpenter** | Avalia workloads, provisiona instâncias otimizadas |  ~30s-1 min |  |
 
 ### Escolha: **Karpenter**
 
 ### Justificativa
 
-- **30s vs 3min** → Karpenter provisiona nodes 3-5x mais rápido
-- **Spot + On-Demand** → Mix automático para otimizar custo
-- **Consolidation** → Remove nós subutilizados automaticamente
-- **Instance diversity** → Escolhe entre 6 famílias de instância
-- **CPU Limit** → Controla gasto máximo (2 vCPU em dev, 100 em prod)
-- **Reciclagem** → Nodes são trocados a cada 30 dias (segurança)
+- **30s vs 3min** -> Karpenter provisiona nodes 3-5x mais rápido
+- **Spot + On-Demand** -> Mix automático para otimizar custo
+- **Consolidation** -> Remove nós subutilizados automaticamente
+- **Instance diversity** -> Escolhe entre 6 famílias de instância
+- **CPU Limit** -> Controla gasto máximo (2 vCPU em dev, 100 em prod)
+- **Reciclagem** -> Nodes são trocados a cada 30 dias (segurança)
 
 ### Backup
 
@@ -231,8 +231,8 @@ Como gerenciar deploy de aplicações de tenants e infraestrutura?
 # Onboarding de novo tenant:
 # 1. Cria pasta tenants/novo-tenant/ no repo
 # 2. Adiciona manifests K8s
-# 3. Push → ArgoCD detecta automaticamente
-# 4. Application criado → Deploy automático
+# 3. Push -> ArgoCD detecta automaticamente
+# 4. Application criado -> Deploy automático
 ```
 
 **Zero configuração manual** para novos tenants!
@@ -243,12 +243,12 @@ Componentes de infra precisam de **versões controladas** (não podem ser "lates
 
 ```yaml
 - name: ingress-nginx
-  version: 4.12.0    # ← Versão fixa, controlada
+  version: 4.12.0    # <- Versão fixa, controlada
 - name: cert-manager
   version: 1.17.0
 ```
 
-Atualizar versão = editar a lista → PR → Review → Merge → Deploy.
+Atualizar versão = editar a lista -> PR -> Review -> Merge -> Deploy.
 
 ---
 
@@ -261,27 +261,27 @@ Como evitar que um tenant acesse ou modifique recursos de outro?
 ### Decisão
 
 ```
-┌─── AppProject: infra ──────────────────┐
-│ ✅ Repos: Helm charts oficiais          │
-│ ✅ Namespaces: ingress, cert-mgr, etc. │
-│ ✅ Cluster resources: todos             │
-│ ❌ Acesso a repos de tenants            │
-└─────────────────────────────────────────┘
+ AppProject: infra 
+  Repos: Helm charts oficiais          
+  Namespaces: ingress, cert-mgr, etc. 
+  Cluster resources: todos             
+  Acesso a repos de tenants            
 
-┌─── AppProject: tenants ────────────────┐
-│ ✅ Repo: github.com/${tenant}           │
-│ ✅ Namespaces: * (qualquer)             │
-│ ✅ Cluster resources: Namespace, Quota  │
-│ ❌ CRDs, ClusterRoles, etc.             │
-└─────────────────────────────────────────┘
+
+ AppProject: tenants 
+  Repo: github.com/${tenant}           
+  Namespaces: * (qualquer)             
+  Cluster resources: Namespace, Quota  
+  CRDs, ClusterRoles, etc.             
+
 ```
 
 ### Justificativa
 
-- **Mínimo privilégio** → Tenants não podem criar CRDs ou ClusterRoles
-- **Isolamento de repos** → Cada projeto só acessa seus repos autorizados
-- **ResourceQuota/LimitRange** → Tenants podem limitar seus próprios namespaces
-- **Orphaned resources** → ArgoCD avisa sobre recursos órfãos
+- **Mínimo privilégio** -> Tenants não podem criar CRDs ou ClusterRoles
+- **Isolamento de repos** -> Cada projeto só acessa seus repos autorizados
+- **ResourceQuota/LimitRange** -> Tenants podem limitar seus próprios namespaces
+- **Orphaned resources** -> ArgoCD avisa sobre recursos órfãos
 
 ---
 
@@ -355,7 +355,7 @@ Como rastrear qual versão da infraestrutura criou cada recurso?
 ### Decisão
 
 ```
-Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations nos recursos
+Git tag (SemVer) -> TF_VAR_infra_version -> Labels/Annotations nos recursos
 ```
 
 | Etapa | O que acontece |
@@ -367,7 +367,7 @@ Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations nos recursos
 
 ### Benefícios
 
-- **Rastreabilidade**: "Qual versão criou este namespace?" → `kubectl get ns argocd -o yaml`
+- **Rastreabilidade**: "Qual versão criou este namespace?" -> `kubectl get ns argocd -o yaml`
 - **Rollback**: Se a v1.2.4 quebrou, volte para v1.2.3
 - **Auditoria**: Tags no Git funcionam como release notes
 
@@ -409,20 +409,20 @@ Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations nos recursos
 | CloudWatch Logs | ~$2 | ~$2 | ~$10 |
 | **TOTAL** | **~$216** | **~$248** | **~$346** |
 
-> **Nota:** Dev pode ser destruído quando não está em uso → $0.
+> **Nota:** Dev pode ser destruído quando não está em uso -> $0.
 > Staging sem EKS = ~$32/mês. Prod sem EKS = ~$122/mês.
 
 ---
 
-## 🧠 Resumo: Como um DevOps Sênior Pensa
+##  Resumo: Como um DevOps Sênior Pensa
 
 ```
-1. PENSE    → Desenhe a arquitetura no papel
-2. DEFINA   → Variáveis primeiro (o contrato)
-3. CONSTRUA → Mínimo viável, iterativamente
-4. VALIDE   → terraform plan a cada passo
-5. DOCUMENTE → Enquanto constrói, não depois
-6. OTIMIZE  → Custo só quando a estrutura básica funciona
+1. PENSE    -> Desenhe a arquitetura no papel
+2. DEFINA   -> Variáveis primeiro (o contrato)
+3. CONSTRUA -> Mínimo viável, iterativamente
+4. VALIDE   -> terraform plan a cada passo
+5. DOCUMENTE -> Enquanto constrói, não depois
+6. OTIMIZE  -> Custo só quando a estrutura básica funciona
 ```
 
 > *"Um DevOps Sênior não é quem sabe tudo de cabeça.
@@ -431,7 +431,7 @@ Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations nos recursos
 
 ---
 
-## 🎨 Guia Visual: Desenhando no Papel (4 Passos)
+##  Guia Visual: Desenhando no Papel (4 Passos)
 
 Se fosse desenhar esta arquitetura no papel/quadro branco, o raciocínio seria este:
 
@@ -461,7 +461,7 @@ Se fosse desenhar esta arquitetura no papel/quadro branco, o raciocínio seria e
   <img src="whiteboard-step3-compute.png" alt="Passo 3: Compute" width="700">
 </p>
 
-> Pense em camadas: VPC (base) → EKS (meio) → ArgoCD (topo). Node Group On-Demand para workloads críticas, Karpenter Spot para o resto. ApplicationSets: **nova pasta no Git = novo tenant automático**.
+> Pense em camadas: VPC (base) -> EKS (meio) -> ArgoCD (topo). Node Group On-Demand para workloads críticas, Karpenter Spot para o resto. ApplicationSets: **nova pasta no Git = novo tenant automático**.
 
 ---
 
@@ -475,4 +475,4 @@ Se fosse desenhar esta arquitetura no papel/quadro branco, o raciocínio seria e
 
 ---
 
-[← Voltar ao README principal](../../README.md)
+[<- Voltar ao README principal](../../README.md)

@@ -1,32 +1,32 @@
-# ☸️ Módulo `tenant-eks` — Cluster Kubernetes Gerenciado
+#  Módulo `tenant-eks` — Cluster Kubernetes Gerenciado
 
-[← Voltar ao README principal](../../../README.md)
+[<- Voltar ao README principal](../../../README.md)
 
 ---
 
-## 📋 Visão Geral
+##  Visão Geral
 
 O módulo `tenant-eks` cria um **cluster EKS completo** com Node Groups, Karpenter para escalonamento inteligente, IAM Roles com mínimo privilégio, criptografia KMS e mecanismo de espera para garantir que o cluster esteja operacional antes de instalar componentes adicionais.
 
 ---
 
-## 📁 Arquivos do Módulo
+##  Arquivos do Módulo
 
 ```
 modules/tenant-eks/
-├── main.tf               ← Cluster EKS + KMS Key + CloudWatch + Security Group
-├── variables.tf          ← 14 variáveis (contrato do módulo)
-├── providers.tf          ← Provider kubectl (gavinbunney)
-├── iam.tf                ← 3 IAM Roles (cluster, node, karpenter)
-├── node-group.tf         ← Node Group On-Demand principal
-├── karpenter.tf          ← EC2NodeClass + NodePool + Subnet Tags
-├── wait-for-cluster.tf   ← Aguarda cluster ACTIVE + nodes READY
-└── outputs.tf            ← 9 outputs
+ main.tf               <- Cluster EKS + KMS Key + CloudWatch + Security Group
+ variables.tf          <- 14 variáveis (contrato do módulo)
+ providers.tf          <- Provider kubectl (gavinbunney)
+ iam.tf                <- 3 IAM Roles (cluster, node, karpenter)
+ node-group.tf         <- Node Group On-Demand principal
+ karpenter.tf          <- EC2NodeClass + NodePool + Subnet Tags
+ wait-for-cluster.tf   <- Aguarda cluster ACTIVE + nodes READY
+ outputs.tf            <- 9 outputs
 ```
 
 ---
 
-## 📥 Variáveis de Entrada (Contrato)
+##  Variáveis de Entrada (Contrato)
 
 ```hcl
 variable "tenant"                      { type = string }                    # "acme-corp"
@@ -50,11 +50,11 @@ variable "tags"                        { type = map(string), default = {} }
 
 ---
 
-## 🔍 Detalhamento por Arquivo
+##  Detalhamento por Arquivo
 
 ### 1. `main.tf` — Cluster EKS
 
-> ⚠️ **ATENÇÃO:** O cluster EKS leva **10-15 minutos** para ficar ACTIVE!
+>  **ATENÇÃO:** O cluster EKS leva **10-15 minutos** para ficar ACTIVE!
 
 ```hcl
 resource "aws_eks_cluster" "this" {
@@ -87,8 +87,8 @@ resource "aws_eks_cluster" "this" {
 
 | Config | Dev/Staging | Prod |
 |--------|:-----------:|:----:|
-| **Endpoint público** | ✅ (`0.0.0.0/0`) | ❌ |
-| **Endpoint privado** | ❌ | ✅ |
+| **Endpoint público** |  (`0.0.0.0/0`) |  |
+| **Endpoint privado** |  |  |
 | **Logs habilitados** | `api` (1 tipo) | 5 tipos (full) |
 | **Retenção de logs** | 7 dias | 90 dias |
 
@@ -102,7 +102,7 @@ resource "aws_eks_cluster" "this" {
 ```hcl
 resource "aws_kms_key" "eks" {
   description         = "EKS Secret Encryption Key - ${local.name_prefix}"
-  enable_key_rotation = true     # ← Rotação automática anual
+  enable_key_rotation = true     # <- Rotação automática anual
 }
 ```
 
@@ -130,41 +130,41 @@ resource "aws_security_group" "cluster" {
 
 ### 2. `iam.tf` — 3 IAM Roles com Mínimo Privilégio
 
-#### 🔵 Role do Cluster (`eks-cluster-role`)
+####  Role do Cluster (`eks-cluster-role`)
 
 ```
-eks.amazonaws.com → AssumeRole → Policies:
-├── AmazonEKSClusterPolicy        ← Gerenciar o cluster
-└── AmazonEKSVPCResourceController ← Gerenciar ENIs para pods
+eks.amazonaws.com -> AssumeRole -> Policies:
+ AmazonEKSClusterPolicy        <- Gerenciar o cluster
+ AmazonEKSVPCResourceController <- Gerenciar ENIs para pods
 ```
 
-#### 🟢 Role dos Nodes (`eks-node-role`)
+####  Role dos Nodes (`eks-node-role`)
 
 ```
-ec2.amazonaws.com → AssumeRole → Policies:
-├── AmazonEKSWorkerNodePolicy      ← Registrar node no cluster
-├── AmazonEKS_CNI_Policy           ← Gerenciar rede (VPC CNI)
-├── AmazonEC2ContainerRegistryReadOnly ← Pull de imagens ECR
-└── AmazonSSMManagedInstanceCore    ← Acesso via Session Manager (sem SSH)
+ec2.amazonaws.com -> AssumeRole -> Policies:
+ AmazonEKSWorkerNodePolicy      <- Registrar node no cluster
+ AmazonEKS_CNI_Policy           <- Gerenciar rede (VPC CNI)
+ AmazonEC2ContainerRegistryReadOnly <- Pull de imagens ECR
+ AmazonSSMManagedInstanceCore    <- Acesso via Session Manager (sem SSH)
 ```
 
-#### 🟠 Role do Karpenter (`karpenter-role`) — Condicional
+####  Role do Karpenter (`karpenter-role`) — Condicional
 
 ```
-ec2.amazonaws.com → AssumeRole → Policies:
-├── AmazonEKSWorkerNodePolicy      ← Registrar nodes
-├── AmazonEKS_CNI_Policy           ← Rede
-├── AmazonEC2ContainerRegistryReadOnly ← ECR
-├── AmazonSSMManagedInstanceCore    ← SSM
-└── Custom Policy:                  ← Específica do Karpenter
-    ├── ec2:CreateLaunchTemplate
-    ├── ec2:CreateFleet
-    ├── ec2:RunInstances
-    ├── ec2:CreateTags
-    ├── ec2:TerminateInstances
-    ├── ec2:Describe*
-    ├── pricing:GetProducts
-    └── iam:PassRole
+ec2.amazonaws.com -> AssumeRole -> Policies:
+ AmazonEKSWorkerNodePolicy      <- Registrar nodes
+ AmazonEKS_CNI_Policy           <- Rede
+ AmazonEC2ContainerRegistryReadOnly <- ECR
+ AmazonSSMManagedInstanceCore    <- SSM
+ Custom Policy:                  <- Específica do Karpenter
+     ec2:CreateLaunchTemplate
+     ec2:CreateFleet
+     ec2:RunInstances
+     ec2:CreateTags
+     ec2:TerminateInstances
+     ec2:Describe*
+     pricing:GetProducts
+     iam:PassRole
 ```
 
 **Por que SSM em vez de SSH?**
@@ -215,7 +215,7 @@ resource "aws_eks_node_group" "main" {
 
 ### 4. `karpenter.tf` — Escalonamento Inteligente
 
-> ⚠️ **IMPORTANTE:** O controller do Karpenter precisa ser instalado **SEPARADAMENTE** via Helm chart. Estes manifests apenas **configuram** o controller.
+>  **IMPORTANTE:** O controller do Karpenter precisa ser instalado **SEPARADAMENTE** via Helm chart. Estes manifests apenas **configuram** o controller.
 
 #### EC2NodeClass — Define o "tipo" de máquina
 
@@ -229,7 +229,7 @@ spec:
   role: acme-corp-dev-karpenter-role    # IAM Role
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: acme-corp-dev    # ← Descobre subnets pela tag
+        karpenter.sh/discovery: acme-corp-dev    # <- Descobre subnets pela tag
   securityGroupSelectorTerms:
     - tags:
         karpenter.sh/discovery: acme-corp-dev
@@ -249,7 +249,7 @@ spec:
           values: ["m6i", "m6a", "m7i", "c6i", "c7i", "r6i"]
         - key: "karpenter.sh/capacity-type"
           operator: In
-          values: ["spot", "on-demand"]       # ← Prioriza Spot
+          values: ["spot", "on-demand"]       # <- Prioriza Spot
         - key: "kubernetes.io/arch"
           operator: In
           values: ["amd64"]
@@ -257,8 +257,8 @@ spec:
     cpu: 2          # Dev: máx 2 vCPU (evita gastos surpresa)
                     # Prod: máx 100 vCPU
   disruption:
-    consolidationPolicy: WhenUnderutilized    # ← Remove nós ociosos
-    expireAfter: 720h                          # ← Recicla a cada 30 dias
+    consolidationPolicy: WhenUnderutilized    # <- Remove nós ociosos
+    expireAfter: 720h                          # <- Recicla a cada 30 dias
 ```
 
 #### Subnet Tags para Descoberta
@@ -276,23 +276,23 @@ resource "aws_ec2_tag" "karpenter_subnets" {
 
 ```
 Pod Pending (sem capacity)
-        │
-        ▼
+        
+        
 Karpenter detecta
-        │
-        ▼
+        
+        
 Avalia requirements (família, arch, capacity-type)
-        │
-        ▼
+        
+        
 Escolhe instância mais barata (Spot se possível)
-        │
-        ▼
-Cria node → Pod scheduled → ✅
+        
+        
+Cria node -> Pod scheduled -> 
 
 ... 10 min sem uso ...
-        │
-        ▼
-Consolidation: remove nó ocioso → 💰
+        
+        
+Consolidation: remove nó ocioso -> 
 ```
 
 ---
@@ -321,7 +321,7 @@ resource "null_resource" "wait_for_cluster" {
       for i in $(seq 1 30); do
         READY_NODES=$(kubectl get nodes --no-headers | grep -c "Ready")
         if [ "$READY_NODES" -ge 1 ]; then
-          echo "✅ $READY_NODES node(s) Ready!"
+          echo " $READY_NODES node(s) Ready!"
           break
         fi
         sleep 10
@@ -340,14 +340,14 @@ data "aws_eks_cluster_auth" "this" {
 **Fluxo temporal:**
 
 ```
-0 min  ─── aws_eks_cluster.this criado (Terraform envia API call)
+0 min   aws_eks_cluster.this criado (Terraform envia API call)
            Status: CREATING
-5 min  ─── Control plane sendo provisionado
-10 min ─── Status: ACTIVE
-           wait_for_cluster: "✅ Cluster EKS ACTIVE!"
-12 min ─── Node group provisionando EC2
-15 min ─── wait_for_cluster: "✅ 2 node(s) Ready!"
-           → Agora sim, aplica Karpenter + ArgoCD
+5 min   Control plane sendo provisionado
+10 min  Status: ACTIVE
+           wait_for_cluster: " Cluster EKS ACTIVE!"
+12 min  Node group provisionando EC2
+15 min  wait_for_cluster: " 2 node(s) Ready!"
+           -> Agora sim, aplica Karpenter + ArgoCD
 ```
 
 ---
@@ -370,44 +370,44 @@ Esses outputs são usados pelo módulo `tenant-argocd` para configurar os provid
 
 ---
 
-## 📐 Diagrama de Componentes
+##  Diagrama de Componentes
 
 ```
-┌──────────────────────────────────── EKS Cluster ──────────────────────────────────┐
-│                                                                                    │
-│   ┌─── Control Plane (Gerenciado pela AWS) ─────────────────────────────────────┐ │
-│   │  API Server ← endpoint (público em dev, privado em prod)                     │ │
-│   │  etcd ← criptografado com KMS Key                                           │ │
-│   │  Logs → CloudWatch (7d dev / 90d prod)                                       │ │
-│   └──────────────────────────────────────────────────────────────────────────────┘ │
-│                                                                                    │
-│   ┌─── Node Group: On-Demand ──────────────┐  ┌─── Karpenter Nodes ────────────┐ │
-│   │  Instâncias: m6i.large / m6a.large     │  │  Instâncias: m6i/m6a/m7i/c6i  │ │
-│   │  Labels: node-pool=ondemand            │  │  Capacity: Spot + On-Demand    │ │
-│   │  Labels: critical=true                 │  │  CPU Limit: 2 (dev) / 100 (prod)│ │
-│   │  Scaling: min=1, desired=2, max=6      │  │  Consolidation: auto           │ │
-│   │  Disco: 50 GB                          │  │  Expiry: 30 dias               │ │
-│   │  IAM: eks-node-role + SSM              │  │  IAM: karpenter-role           │ │
-│   │                                         │  │                                │ │
-│   │  [ArgoCD] [Controllers] [Criticals]    │  │  [Tenant Apps] [Spot Workloads]│ │
-│   └─────────────────────────────────────────┘  └────────────────────────────────┘ │
-│                                                                                    │
-│   ┌─── IAM Roles ──────────────────────────────────────────────────────────────┐  │
-│   │  🔵 Cluster Role → EKSClusterPolicy + VPCResourceController               │  │
-│   │  🟢 Node Role    → WorkerNode + CNI + ECR + SSM                            │  │
-│   │  🟠 Karpenter    → Node policies + Custom (EC2 Create/Terminate)           │  │
-│   └────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                    │
-│   ┌─── Segurança ──────────────────────────────────────────────────────────────┐  │
-│   │  🔐 KMS Key (rotação automática) → Secrets encryption                      │  │
-│   │  🛡️ Security Group → Egress only (AWS gerencia ingress)                    │  │
-│   └────────────────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────────────────┘
+ EKS Cluster 
+                                                                                    
+    Control Plane (Gerenciado pela AWS)  
+     API Server <- endpoint (público em dev, privado em prod)                      
+     etcd <- criptografado com KMS Key                                            
+     Logs -> CloudWatch (7d dev / 90d prod)                                        
+    
+                                                                                    
+    Node Group: On-Demand    Karpenter Nodes  
+     Instâncias: m6i.large / m6a.large         Instâncias: m6i/m6a/m7i/c6i   
+     Labels: node-pool=ondemand                Capacity: Spot + On-Demand     
+     Labels: critical=true                     CPU Limit: 2 (dev) / 100 (prod) 
+     Scaling: min=1, desired=2, max=6          Consolidation: auto            
+     Disco: 50 GB                              Expiry: 30 dias                
+     IAM: eks-node-role + SSM                  IAM: karpenter-role            
+                                                                               
+     [ArgoCD] [Controllers] [Criticals]        [Tenant Apps] [Spot Workloads] 
+      
+                                                                                    
+    IAM Roles   
+      Cluster Role -> EKSClusterPolicy + VPCResourceController                 
+      Node Role    -> WorkerNode + CNI + ECR + SSM                              
+      Karpenter    -> Node policies + Custom (EC2 Create/Terminate)             
+     
+                                                                                    
+    Segurança   
+      KMS Key (rotação automática) -> Secrets encryption                        
+      Security Group -> Egress only (AWS gerencia ingress)                      
+     
+
 ```
 
 ---
 
-## 🧪 Exemplo de Uso
+##  Exemplo de Uso
 
 ```hcl
 module "tenant_eks" {
@@ -434,7 +434,7 @@ module "tenant_eks" {
 
 ---
 
-## ⚠️ Troubleshooting
+##  Troubleshooting
 
 | Erro | Causa | Solução |
 |------|-------|---------|
@@ -446,7 +446,7 @@ module "tenant_eks" {
 
 ---
 
-## 🧠 Conceitos para Estudar
+##  Conceitos para Estudar
 
 | Conceito | O que é | Relevância |
 |---------|---------|-----------|
@@ -463,4 +463,4 @@ module "tenant_eks" {
 
 ---
 
-[← Voltar ao README principal](../../../README.md)
+[<- Voltar ao README principal](../../../README.md)

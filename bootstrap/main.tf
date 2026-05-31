@@ -1,4 +1,4 @@
-# ─── Bootstrap: Cria o backend S3 e DynamoDB para lock state ───
+#  Bootstrap: Cria o backend S3 e DynamoDB para lock state 
 # Deve ser aplicado primeiro manualmente com `terraform apply`
 # Depois os ambientes usam este backend
 

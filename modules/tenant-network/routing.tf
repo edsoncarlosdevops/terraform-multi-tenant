@@ -1,4 +1,4 @@
-# ─── Route Table Pública ────────────────────────────────────────
+#  Route Table Pública 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
@@ -22,7 +22,7 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# ─── Route Tables Privadas ─────────────────────────────────────
+#  Route Tables Privadas 
 resource "aws_route_table" "private" {
   count = var.vpc.single_nat_gateway ? 1 : length(local.azs)
 

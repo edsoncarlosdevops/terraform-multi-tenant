@@ -1,4 +1,4 @@
-# 🔧 Configuração GitHub Actions + AWS
+#  Configuração GitHub Actions + AWS
 
 ## 1. Criar IAM Role para GitHub Actions
 

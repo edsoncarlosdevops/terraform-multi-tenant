@@ -1,4 +1,4 @@
-# ─── Instalação do ArgoCD via Helm ───────────────────────────
+#  Instalação do ArgoCD via Helm 
 resource "helm_release" "argocd" {
 
   name       = "argocd"

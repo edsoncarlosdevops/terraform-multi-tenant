@@ -1,18 +1,18 @@
-# 🔧 Bootstrap — Backend Remoto (S3 + DynamoDB)
+#  Bootstrap — Backend Remoto (S3 + DynamoDB)
 
-[← Voltar ao README principal](../../README.md)
+[<- Voltar ao README principal](../../README.md)
 
 ---
 
-## 📋 O que é o Bootstrap?
+##  O que é o Bootstrap?
 
 O Bootstrap é o **primeiro passo** da infraestrutura. Ele cria os recursos necessários para que o Terraform armazene seu **state remotamente** e garanta **locking** para evitar conflitos.
 
-> ⚠️ **Este módulo deve ser aplicado manualmente apenas UMA VEZ**, antes de qualquer outro deploy.
+>  **Este módulo deve ser aplicado manualmente apenas UMA VEZ**, antes de qualquer outro deploy.
 
 ---
 
-## 🏗️ Recursos Criados
+##  Recursos Criados
 
 ### 1. S3 Bucket — `tfstate-saas-multi-tenant`
 
@@ -99,19 +99,19 @@ resource "aws_dynamodb_table" "terraform_lock" {
 **Como funciona o locking:**
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  terraform apply (Terminal A)                        │
-│    1. Escreve LockID na DynamoDB                     │
-│    2. Aplica mudanças                                │
-│    3. Remove LockID ao terminar                      │
-└──────────────────────────────────────────────────────┘
 
-┌──────────────────────────────────────────────────────┐
-│  terraform apply (Terminal B — enquanto A roda)      │
-│    1. Tenta escrever LockID → CONFLITO!              │
-│    2. Retorna erro: "Error locking state"            │
-│    3. Nenhuma mudança é feita                        │
-└──────────────────────────────────────────────────────┘
+  terraform apply (Terminal A)                        
+    1. Escreve LockID na DynamoDB                     
+    2. Aplica mudanças                                
+    3. Remove LockID ao terminar                      
+
+
+
+  terraform apply (Terminal B — enquanto A roda)      
+    1. Tenta escrever LockID -> CONFLITO!              
+    2. Retorna erro: "Error locking state"            
+    3. Nenhuma mudança é feita                        
+
 ```
 
 **Por que `PAY_PER_REQUEST`?**
@@ -121,7 +121,7 @@ resource "aws_dynamodb_table" "terraform_lock" {
 
 ---
 
-## 📄 Arquivos
+##  Arquivos
 
 ### `bootstrap/provider.tf`
 
@@ -150,7 +150,7 @@ Contém os 4 recursos descritos acima (bucket, versionamento, criptografia, bloq
 
 ---
 
-## 🚀 Como Usar
+##  Como Usar
 
 ### Primeira vez (setup)
 
@@ -177,7 +177,7 @@ aws dynamodb describe-table --table-name tfstate-lock --query 'Table.TableStatus
 
 ---
 
-## 🔗 Como os Ambientes Usam o Backend
+##  Como os Ambientes Usam o Backend
 
 Cada ambiente referencia o backend criado pelo bootstrap:
 
@@ -186,10 +186,10 @@ Cada ambiente referencia o backend criado pelo bootstrap:
 terraform {
   backend "s3" {
     bucket         = "tfstate-saas-multi-tenant"
-    key            = "environments/dev/terraform.tfstate"    # ← path único por ambiente
+    key            = "environments/dev/terraform.tfstate"    # <- path único por ambiente
     region         = "us-east-1"
     encrypt        = true
-    dynamodb_table = "tfstate-lock"                          # ← locking
+    dynamodb_table = "tfstate-lock"                          # <- locking
   }
 }
 ```
@@ -198,15 +198,15 @@ terraform {
 
 ```
 s3://tfstate-saas-multi-tenant/
-├── environments/
-│   ├── dev/terraform.tfstate
-│   ├── staging/terraform.tfstate
-│   └── prod/terraform.tfstate
+ environments/
+    dev/terraform.tfstate
+    staging/terraform.tfstate
+    prod/terraform.tfstate
 ```
 
 ---
 
-## ⚠️ Cuidados
+##  Cuidados
 
 | Cenário | O que acontece | Como resolver |
 |---------|---------------|---------------|
@@ -217,7 +217,7 @@ s3://tfstate-saas-multi-tenant/
 
 ---
 
-## 🧠 Conceitos para Estudar
+##  Conceitos para Estudar
 
 | Conceito | O que é | Link |
 |---------|---------|------|
@@ -228,4 +228,4 @@ s3://tfstate-saas-multi-tenant/
 
 ---
 
-[← Voltar ao README principal](../../README.md)
+[<- Voltar ao README principal](../../README.md)

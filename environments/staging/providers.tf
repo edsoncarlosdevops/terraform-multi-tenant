@@ -1,9 +1,9 @@
-# ═══════════════════════════════════════════════════════════════
+# 
 # PROVIDERS + DATA SOURCES
-# ═══════════════════════════════════════════════════════════════
+# 
 # ATENCAO: Providers kubectl/helm/kubernetes SO funcionam
 # DEPOIS que o cluster EKS estiver ACTIVE.
-# ═══════════════════════════════════════════════════════════════
+# 
 
 data "aws_eks_cluster_auth" "this" {
   name = module.tenant_eks.cluster_name
