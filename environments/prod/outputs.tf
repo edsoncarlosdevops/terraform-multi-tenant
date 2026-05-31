@@ -22,3 +22,33 @@ output "vpc_flow_log_group" {
   description = "Nome do CloudWatch Log Group para flow logs"
   value       = try(module.tenant_network.vpc_flow_log_group, "")
 }
+
+output "eks_cluster_name" {
+  description = "Nome do cluster EKS"
+  value       = module.tenant_eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "Endpoint do cluster EKS"
+  value       = module.tenant_eks.cluster_endpoint
+}
+
+output "eks_cluster_arn" {
+  description = "ARN do cluster EKS"
+  value       = module.tenant_eks.cluster_arn
+}
+
+output "karpenter_role_arn" {
+  description = "ARN da role do Karpenter"
+  value       = module.tenant_eks.karpenter_role_arn
+}
+
+output "argocd_namespace" {
+  description = "Namespace do ArgoCD"
+  value       = module.tenant_argocd.argocd_namespace
+}
+
+output "argocd_server" {
+  description = "URL do ArgoCD server"
+  value       = module.tenant_argocd.argocd_server
+}

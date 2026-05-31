@@ -25,3 +25,27 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "infra_version" {
+  description = "Versão da infraestrutura (tag git) para rastreabilidade"
+  type        = string
+  default     = "prod"
+}
+
+variable "enable_karpenter" {
+  description = "Habilitar Karpenter no cluster EKS"
+  type        = bool
+  default     = true
+}
+
+variable "karpenter_instance_families" {
+  description = "Familias de instancia EC2 permitidas pelo Karpenter"
+  type        = list(string)
+  default     = ["m6i", "m6a", "m7i", "c6i", "c7i", "r6i"]
+}
+
+variable "argocd_domain" {
+  description = "Domínio para acesso ao ArgoCD (obrigatório em prod)"
+  type        = string
+  default     = ""
+}
