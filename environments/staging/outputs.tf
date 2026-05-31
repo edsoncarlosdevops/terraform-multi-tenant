@@ -18,6 +18,7 @@ output "nat_gateway_ids" {
   value       = module.tenant_network.nat_gateway_ids
 }
 
+# ─── EKS ───────────────────────────────────────────────────────
 output "eks_cluster_name" {
   description = "Nome do cluster EKS"
   value       = module.tenant_eks.cluster_name
@@ -33,11 +34,33 @@ output "eks_cluster_arn" {
   value       = module.tenant_eks.cluster_arn
 }
 
+output "cluster_security_group_id" {
+  description = "ID do security group do cluster EKS"
+  value       = module.tenant_eks.cluster_security_group_id
+}
+
+output "node_role_arn" {
+  description = "ARN da IAM Role dos nodes do EKS"
+  value       = module.tenant_eks.node_role_arn
+}
+
+output "kms_key_arn" {
+  description = "ARN da KMS Key para criptografia do EKS"
+  value       = module.tenant_eks.kms_key_arn
+}
+
+# ─── Karpenter ─────────────────────────────────────────────────
 output "karpenter_role_arn" {
-  description = "ARN da role do Karpenter"
+  description = "ARN da role EC2 do Karpenter (para os nodes que ele cria)"
   value       = module.tenant_eks.karpenter_role_arn
 }
 
+output "karpenter_controller_role_arn" {
+  description = "ARN da role IRSA do controller do Karpenter"
+  value       = module.tenant_eks.karpenter_controller_role_arn
+}
+
+# ─── ArgoCD ────────────────────────────────────────────────────
 output "argocd_namespace" {
   description = "Namespace do ArgoCD"
   value       = module.tenant_argocd.argocd_namespace
@@ -46,4 +69,14 @@ output "argocd_namespace" {
 output "argocd_server" {
   description = "URL do ArgoCD server"
   value       = module.tenant_argocd.argocd_server
+}
+
+output "argocd_initial_password" {
+  description = "Comando para obter a senha inicial do admin do ArgoCD"
+  value       = module.tenant_argocd.argocd_initial_password
+}
+
+output "argocd_login_command" {
+  description = "Instruções para fazer port-forward e logar no ArgoCD"
+  value       = module.tenant_argocd.argocd_login_command
 }
