@@ -1,22 +1,22 @@
-#  Bootstrap — Backend Remoto (S3 + DynamoDB)
+# 🔧 Bootstrap — Remote Backend (S3 + DynamoDB)
 
-[← Voltar ao README principal](../../README.md)
-
----
-
-##  O que é o Bootstrap?
-
-O Bootstrap é o **primeiro passo** da infraestrutura. Ele cria os recursos necessários para que o Terraform armazene seu **state remotamente** e garanta **locking** para evitar conflitos.
-
-> ️ **Este módulo deve ser aplicado manualmente apenas UMA VEZ**, antes de qualquer outro deploy.
+[← Back to main README](../../README.md)
 
 ---
 
-## ️ Recursos Criados
+## 📋 What is Bootstrap?
+
+Bootstrap is the **first step** of the infrastructure. It creates the necessary resources for Terraform to store its **state remotely** and guarantee **locking** to prevent conflicts.
+
+> ⚠️ **This module must be applied manually only ONCE**, before any other deployment.
+
+---
+
+## 🏗️ Created Resources
 
 ### 1. S3 Bucket — `tfstate-saas-multi-tenant`
 
-O bucket armazena os arquivos `.tfstate` de todos os ambientes.
+The bucket stores the `.tfstate` files for all environments.
 
 ```hcl
 resource "aws_s3_bucket" "terraform_state" {
@@ -24,15 +24,15 @@ resource "aws_s3_bucket" "terraform_state" {
 }
 ```
 
-**Configurações de segurança aplicadas:**
+**Security configurations applied:**
 
-| Configuração | Valor | Por quê? |
+| Configuration | Value | Why? |
 |:------------|:------|:---------|
-| **Versionamento** | `Enabled` | Permite recuperar states anteriores em caso de corrupção |
-| **Criptografia** | `AES256` (SSE-S3) | Protege o state em repouso (contém dados sensíveis como ARNs, IPs) |
-| **Bloqueio de acesso público** | 4 flags ativadas | Garante que o bucket nunca será exposto publicamente |
+| **Versioning** | `Enabled` | Allows recovering previous states in case of corruption |
+| **Encryption** | `AES256` (SSE-S3) | Protects the state at rest (contains sensitive data like ARNs, IPs) |
+| **Public access block** | 4 flags enabled | Ensures that the bucket is never exposed publicly |
 
-#### Versionamento
+#### Versioning
 
 ```hcl
 resource "aws_s3_bucket_versioning" "this" {
@@ -43,12 +43,12 @@ resource "aws_s3_bucket_versioning" "this" {
 }
 ```
 
-**Por que versionar?**
-- Se alguém rodar `terraform destroy` acidentalmente, o state anterior ainda existe
-- Permite auditar mudanças históricas no state
-- Facilita rollback de estados corrompidos
+**Why version?**
+- If someone runs `terraform destroy` accidentally, the previous state still exists
+- Allows auditing historical changes in the state
+- Facilitates rollback of corrupted states
 
-#### Criptografia Server-Side
+#### Server-Side Encryption
 
 ```hcl
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
@@ -61,27 +61,27 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
 }
 ```
 
-**Por que criptografar?**
-- O `.tfstate` contém informações sensíveis (endpoints, ARNs, configurações)
-- Requisito de compliance (SOC2, HIPAA, PCI-DSS)
-- `AES256` é o mais simples e sem custo adicional (vs KMS que cobra por chamada)
+**Why encrypt?**
+- The `.tfstate` contains sensitive information (endpoints, ARNs, configurations)
+- Compliance requirement (SOC2, HIPAA, PCI-DSS)
+- `AES256` is the simplest and has no additional cost (vs KMS which charges per call)
 
-#### Bloqueio de Acesso Público
+#### Public Access Block
 
 ```hcl
 resource "aws_s3_bucket_public_access_block" "this" {
   bucket = aws_s3_bucket.terraform_state.id
 
-  block_public_acls       = true   # Bloqueia ACLs públicas novas
-  block_public_policy     = true   # Bloqueia bucket policies que permitem público
-  ignore_public_acls      = true   # Ignora ACLs públicas existentes
-  restrict_public_buckets = true   # Restringe acesso público ao bucket
+  block_public_acls       = true   # Blocks new public ACLs
+  block_public_policy     = true   # Blocks bucket policies that allow public access
+  ignore_public_acls      = true   # Ignores existing public ACLs
+  restrict_public_buckets = true   # Restricts public access to the bucket
 }
 ```
 
 ### 2. DynamoDB Table — `tfstate-lock`
 
-A tabela implementa **state locking** para evitar que dois `terraform apply` rodem ao mesmo tempo.
+The table implements **state locking** to prevent two `terraform apply` runs from executing at the same time.
 
 ```hcl
 resource "aws_dynamodb_table" "terraform_lock" {
@@ -96,32 +96,32 @@ resource "aws_dynamodb_table" "terraform_lock" {
 }
 ```
 
-**Como funciona o locking:**
+**How locking works:**
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │  terraform apply (Terminal A)                        │
-│    1. Escreve LockID na DynamoDB                     │
-│    2. Aplica mudanças                                │
-│    3. Remove LockID ao terminar                      │
+│    1. Writes LockID to DynamoDB                      │
+│    2. Applies changes                                │
+│    3. Removes LockID when finished                   │
 └──────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────┐
-│  terraform apply (Terminal B — enquanto A roda)      │
-│    1. Tenta escrever LockID → CONFLITO!              │
-│    2. Retorna erro: "Error locking state"            │
-│    3. Nenhuma mudança é feita                        │
+│  terraform apply (Terminal B — while A is running)   │
+│    1. Tries to write LockID → CONFLICT!              │
+│    2. Returns error: "Error locking state"           │
+│    3. No changes are made                            │
 └──────────────────────────────────────────────────────┘
 ```
 
-**Por que `PAY_PER_REQUEST`?**
-- O lock é acessado apenas durante `plan` e `apply`
-- Na maioria dos projetos, são poucas chamadas por dia
-- Custo praticamente zero (~$0.001/mês)
+**Why `PAY_PER_REQUEST`?**
+- The lock is accessed only during `plan` and `apply`
+- In most projects, there are few calls per day
+- Practically zero cost (~$0.001/month)
 
 ---
 
-##  Arquivos
+## 📄 Files
 
 ### `bootstrap/provider.tf`
 
@@ -142,17 +142,17 @@ provider "aws" {
 }
 ```
 
-**Detalhe:** O bootstrap **não usa backend remoto** (chicken-and-egg problem). O state do bootstrap fica local no `.terraform/` ou pode ser importado depois.
+**Detail:** The bootstrap **does not use a remote backend** (chicken-and-egg problem). The bootstrap state remains local in `.terraform/` or can be imported later.
 
 ### `bootstrap/main.tf`
 
-Contém os 4 recursos descritos acima (bucket, versionamento, criptografia, bloqueio público, tabela DynamoDB).
+Contains the 4 resources described above (bucket, versioning, encryption, public block, DynamoDB table).
 
 ---
 
-##  Como Usar
+## 🚀 How to Use
 
-### Primeira vez (setup)
+### First time (setup)
 
 ```bash
 cd bootstrap
@@ -160,33 +160,33 @@ terraform init
 terraform apply -auto-approve
 ```
 
-**Output esperado:**
+**Expected output:**
 ```
 Apply complete! Resources: 5 added, 0 changed, 0 destroyed.
 ```
 
-### Verificar recursos criados
+### Verify created resources
 
 ```bash
-# Verificar bucket
+# Verify bucket
 aws s3 ls | grep tfstate
 
-# Verificar tabela
+# Verify table
 aws dynamodb describe-table --table-name tfstate-lock --query 'Table.TableStatus'
 ```
 
 ---
 
-##  Como os Ambientes Usam o Backend
+## 🔗 How Environments Use the Backend
 
-Cada ambiente referencia o backend criado pelo bootstrap:
+Each environment references the backend created by the bootstrap:
 
 ```hcl
 # environments/dev/main.tf
 terraform {
   backend "s3" {
     bucket         = "tfstate-saas-multi-tenant"
-    key            = "environments/dev/terraform.tfstate"    # ← path único por ambiente
+    key            = "environments/dev/terraform.tfstate"    # ← unique path per environment
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "tfstate-lock"                          # ← locking
@@ -194,7 +194,7 @@ terraform {
 }
 ```
 
-**Estrutura dos states no S3:**
+**S3 state structure:**
 
 ```
 s3://tfstate-saas-multi-tenant/
@@ -206,26 +206,26 @@ s3://tfstate-saas-multi-tenant/
 
 ---
 
-## ️ Cuidados
+## ⚠️ Precautions
 
-| Cenário | O que acontece | Como resolver |
+| Scenario | What happens | How to resolve |
 |---------|---------------|---------------|
-| Deletar o bucket S3 | State de TODOS os ambientes é perdido | **Nunca delete**. Se precisar, importe o state primeiro |
-| Deletar a tabela DynamoDB | Locking para de funcionar | Recrie a tabela com o mesmo nome e hash key |
-| Lock preso (apply travou) | Nenhum apply funciona | `terraform force-unlock <LOCK_ID>` |
-| Mudar nome do bucket | Ambientes perdem referência ao state | Atualize todos os `backend "s3"` + migre com `terraform init -migrate-state` |
+| Delete the S3 bucket | State of ALL environments is lost | **Never delete**. If needed, import the state first |
+| Delete the DynamoDB table | Locking stops working | Recreate the table with the same name and hash key |
+| Stuck lock (apply crashed/hung) | No applies will work | `terraform force-unlock <LOCK_ID>` |
+| Change bucket name | Environments lose reference to state | Update all `backend "s3"` configurations + migrate with `terraform init -migrate-state` |
 
 ---
 
-##  Conceitos para Estudar
+## 🧠 Concepts to Study
 
-| Conceito | O que é | Link |
+| Concept | What it is | Link |
 |---------|---------|------|
-| **Terraform State** | Arquivo que mapeia recursos reais ↔ configuração | [docs](https://developer.hashicorp.com/terraform/language/state) |
-| **Remote Backend** | Armazenar state fora da máquina local | [docs](https://developer.hashicorp.com/terraform/language/settings/backends/s3) |
-| **State Locking** | Prevenir applies simultâneos | [docs](https://developer.hashicorp.com/terraform/language/state/locking) |
-| **S3 Versionamento** | Manter histórico de objetos no S3 | [docs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html) |
+| **Terraform State** | File mapping real resources ↔ configuration | [docs](https://developer.hashicorp.com/terraform/language/state) |
+| **Remote Backend** | Store state outside the local machine | [docs](https://developer.hashicorp.com/terraform/language/settings/backends/s3) |
+| **State Locking** | Prevent simultaneous applies | [docs](https://developer.hashicorp.com/terraform/language/state/locking) |
+| **S3 Versioning** | Keep S3 object history | [docs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html) |
 
 ---
 
-[← Voltar ao README principal](../../README.md)
+[← Back to main README](../../README.md)

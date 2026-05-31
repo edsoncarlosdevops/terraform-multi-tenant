@@ -68,11 +68,11 @@ Este projeto implementa uma **infraestrutura SaaS multi-tenant completa na AWS**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              GITHUB ACTIONS                                 │
-│  ┌──────────┐  ┌───────────┐  ┌───────────┐  ┌──────────┐  ┌───────────┐    │
-│  │ CI: Plan │  │ CD: Apply │  │  Security │  │ Infracost│  │ Tag/SemVer│    │
-│  └────┬─────┘  └─────┬─────┘  └─────┬─────┘  └────┬─────┘  └─────┬─────┘    │
-└───────┼──────────────┼──────────────┼──────────────┼──────────────┼────────-┘
+│                              GITHUB ACTIONS                                │
+│  ┌──────────┐  ┌───────────┐  ┌───────────┐  ┌──────────┐  ┌───────────┐  │
+│  │ CI: Plan │  │ CD: Apply │  │  Security │  │ Infracost│  │ Tag/SemVer│  │
+│  └────┬─────┘  └─────┬─────┘  └─────┬─────┘  └────┬─────┘  └─────┬─────┘  │
+└───────┼──────────────┼──────────────┼──────────────┼──────────────┼────────┘
         │              │              │              │              │
         └──────────────┴──────────────┴──────────────┴──────────────┘
                                       │
@@ -81,8 +81,8 @@ Este projeto implementa uma **infraestrutura SaaS multi-tenant completa na AWS**
                               │  (us-east-1)  │
                               └───────┬───────┘
                                       │
-        ┌─────────────────────────────┼────────────────────────────┐
-        │                             │                            │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        │                             │                             │
    ┌────┴────┐                  ┌─────┴────┐                 ┌─────┴────┐
    │   DEV   │                  │ STAGING  │                 │   PROD   │
    │ 10.10.x │                  │ 10.20.x  │                 │ 10.30.x  │
@@ -92,11 +92,11 @@ Este projeto implementa uma **infraestrutura SaaS multi-tenant completa na AWS**
         │                            │                             │
    ┌────┴────────────┐    ┌──────────┴──────────┐    ┌─────────────┴────────┐
    │  EKS Cluster    │    │  EKS Cluster        │    │  EKS Cluster         │
-   │  + Karpenter    │    │  + Karpenter        │    │  + Karpenter         │
-   │  + ArgoCD       │    │  + ArgoCD           │    │  + ArgoCD            │
-   │  CPU limit: 2   │    │  CPU limit: 100     │    │  CPU limit: 100      │
-   │  Logs: api only │    │  Logs: api only     │    │  Logs: full (5 tipos)│
-   │  KMS: ✅        │    │  KMS: ✅             │    │  KMS: ✅ + Flow Logs │
+   │  + Karpenter    │    │  + Karpenter         │    │  + Karpenter         │
+   │  + ArgoCD       │    │  + ArgoCD            │    │  + ArgoCD            │
+   │  CPU limit: 2   │    │  CPU limit: 100      │    │  CPU limit: 100      │
+   │  Logs: api only │    │  Logs: api only      │    │  Logs: full (5 tipos)│
+   │  KMS: ✅        │    │  KMS: ✅              │    │  KMS: ✅ + Flow Logs │
    └─────────────────┘    └─────────────────────┘    └──────────────────────┘
 ```
 
@@ -189,16 +189,16 @@ terraform-multi-tenant/
 │   └── version.sh                             │  Versionamento SemVer local
 │
 └── 📚 docs/                                  ← Documentação adicional
-    ├── github-actions-setup.md                │  Guia: IAM OIDC + Secrets + Environments
-    ├── bootstrap/README.md                    │  Doc: Backend S3/DynamoDB
+    ├── github-actions-setup.pt-br.md          │  Guia: IAM OIDC + Secrets + Environments
+    ├── bootstrap/README.pt-br.md              │  Doc: Backend S3/DynamoDB
     ├── modules/
-    │   ├── tenant-network/README.md           │  Doc: Módulo de rede
-    │   ├── tenant-eks/README.md               │  Doc: Módulo EKS
-    │   └── tenant-argocd/README.md            │  Doc: Módulo ArgoCD
-    ├── environments/README.md                 │  Doc: Ambientes dev/staging/prod
-    ├── ci-cd/README.md                        │  Doc: Workflows GitHub Actions
-    ├── scripts/README.md                      │  Doc: Scripts utilitários
-    └── architecture/README.md                 │  Doc: Decisões de arquitetura
+    │   ├── tenant-network/README.pt-br.md     │  Doc: Módulo de rede
+    │   ├── tenant-eks/README.pt-br.md         │  Doc: Módulo EKS
+    │   └── tenant-argocd/README.pt-br.md      │  Doc: Módulo ArgoCD
+    ├── environments/README.pt-br.md           │  Doc: Ambientes dev/staging/prod
+    ├── ci-cd/README.pt-br.md                  │  Doc: Workflows GitHub Actions
+    ├── scripts/README.pt-br.md                │  Doc: Scripts utilitários
+    └── architecture/README.pt-br.md           │  Doc: Decisões de arquitetura
 ```
 
 ---
@@ -299,14 +299,14 @@ Cada componente do projeto possui sua própria documentação detalhada:
 
 | Seção | Link | Descrição |
 |-------|------|-----------| 
-| 🔧 Bootstrap | [docs/bootstrap/README.md](docs/bootstrap/README.md) | Backend S3 + DynamoDB, state locking, segurança |
-| 🌐 Módulo Network | [docs/modules/tenant-network/README.md](docs/modules/tenant-network/README.md) | VPC, Subnets, NAT, Endpoints, Flow Logs |
-| ☸️ Módulo EKS | [docs/modules/tenant-eks/README.md](docs/modules/tenant-eks/README.md) | Cluster EKS, Node Groups, Karpenter, IAM, KMS |
-| 🔄 Módulo ArgoCD | [docs/modules/tenant-argocd/README.md](docs/modules/tenant-argocd/README.md) | ArgoCD, ApplicationSets, AppProjects, RBAC |
-| 🌍 Environments | [docs/environments/README.md](docs/environments/README.md) | Dev, Staging, Prod — configurações e custos |
-| ⚙️ CI/CD | [docs/ci-cd/README.md](docs/ci-cd/README.md) | Workflows: CI, CD, Security Weekly |
-| 📜 Scripts | [docs/scripts/README.md](docs/scripts/README.md) | deploy.sh, setup-github.sh, version.sh |
-| 🏛️ Arquitetura | [docs/architecture/README.md](docs/architecture/README.md) | Decisões de design, modelo Silo, FinOps |
+| 🔧 Bootstrap | [docs/bootstrap/README.pt-br.md](docs/bootstrap/README.pt-br.md) | Backend S3 + DynamoDB, state locking, segurança |
+| 🌐 Módulo Network | [docs/modules/tenant-network/README.pt-br.md](docs/modules/tenant-network/README.pt-br.md) | VPC, Subnets, NAT, Endpoints, Flow Logs |
+| ☸️ Módulo EKS | [docs/modules/tenant-eks/README.pt-br.md](docs/modules/tenant-eks/README.pt-br.md) | Cluster EKS, Node Groups, Karpenter, IAM, KMS |
+| 🔄 Módulo ArgoCD | [docs/modules/tenant-argocd/README.pt-br.md](docs/modules/tenant-argocd/README.pt-br.md) | ArgoCD, ApplicationSets, AppProjects, RBAC |
+| 🌍 Environments | [docs/environments/README.pt-br.md](docs/environments/README.pt-br.md) | Dev, Staging, Prod — configurações e custos |
+| ⚙️ CI/CD | [docs/ci-cd/README.pt-br.md](docs/ci-cd/README.pt-br.md) | Workflows: CI, CD, Security Weekly |
+| 📜 Scripts | [docs/scripts/README.pt-br.md](docs/scripts/README.pt-br.md) | deploy.sh, setup-github.sh, version.sh |
+| 🏛️ Arquitetura | [docs/architecture/README.pt-br.md](docs/architecture/README.pt-br.md) | Decisões de design, modelo Silo, FinOps |
 
 ---
 
@@ -336,11 +336,11 @@ Cada componente do projeto possui sua própria documentação detalhada:
 ## 🔄 Pipeline CI/CD
 
 ```
-                    ┌────────────────────────────────-┐
+                    ┌────────────────────────────────┐
                     │       Developer cria PR         │
-                    └──────────────┬─────────────────-┘
+                    └──────────────┬─────────────────┘
                                    │
-                    ┌──────────────▼────────────────-─┐
+                    ┌──────────────▼─────────────────┐
                     │   CI Workflow (ci.yml)          │
                     │                                 │
                     │  1. terraform fmt -check        │
@@ -350,24 +350,24 @@ Cada componente do projeto possui sua própria documentação detalhada:
                     │  5. Gitleaks (secrets scan)     │
                     │  6. terraform plan (por env)    │
                     │  7. Comentário no PR            │
-                    └──────────────┬─────────────────-┘
+                    └──────────────┬─────────────────┘
                                    │ merge
-                    ┌──────────────▼───────────────-──┐
+                    ┌──────────────▼─────────────────┐
                     │   CD Workflow (cd.yml)          │
                     │                                 │
                     │  1. Calcula SemVer tag          │
                     │  2. Cria Git Tag automática     │
                     │  3. terraform apply (por env)   │
                     │  4. Notifica Slack              │
-                    └───────────────────────────────-─┘
+                    └────────────────────────────────┘
 
-                    ┌───────────────────────────────-─┐
-                    │ Security Weekly (domingo 8h)    │
+                    ┌────────────────────────────────┐
+                    │ Security Weekly (domingo 8h)   │
                     │                                 │
                     │  1. kube-bench (CIS)            │
                     │  2. Popeye (sanidade cluster)   │
                     │  3. Kubescape (NSA/CISA)        │
-                    └────────────────────────────────-┘
+                    └────────────────────────────────┘
 ```
 
 ---

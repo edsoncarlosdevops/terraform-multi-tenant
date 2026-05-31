@@ -1,108 +1,108 @@
-# 🌐 Module `tenant-network` — Multi-Tenant VPC
+#  Módulo `tenant-network` — VPC Multi-Tenant
 
-[← Back to main README](../../../README.md)
-
----
-
-## 📋 Overview
-
-The `tenant-network` module creates all **network infrastructure** for a tenant. Each call creates an **isolated VPC** with public/private subnets, conditional NAT Gateway, VPC Endpoints, and Flow Logs.
-
-**Philosophy:** One file per responsibility. `main.tf` has only 36 lines.
+[← Voltar ao README principal](../../../README.pt-br.md)
 
 ---
 
-## 📁 Module Files
+##  Visão Geral
+
+O módulo `tenant-network` cria toda a **infraestrutura de rede** para um tenant. Cada chamada cria uma **VPC isolada** com subnets públicas/privadas, NAT Gateway condicional, VPC Endpoints e Flow Logs.
+
+**Filosofia:** Um arquivo por responsabilidade. O `main.tf` tem apenas 36 linhas.
+
+---
+
+##  Arquivos do Módulo
 
 ```
 modules/tenant-network/
 ├── main.tf           ← VPC + Internet Gateway + locals
-├── variables.tf      ← 4 variables (module contract)
-├── subnets.tf        ← Public and private subnets
-├── nat-gateway.tf    ← Elastic IP + conditional NAT Gateway
-├── routing.tf        ← Public/private route tables + associations
+├── variables.tf      ← 4 variáveis (contrato do módulo)
+├── subnets.tf        ← Subnets públicas e privadas
+├── nat-gateway.tf    ← Elastic IP + NAT Gateway condicional
+├── routing.tf        ← Route tables públicas/privadas + associações
 ├── endpoints.tf      ← VPC Endpoints (Gateway: S3/DynamoDB + Interface: ECR/Logs)
-├── flow-logs.tf      ← VPC Flow Logs + IAM Role (prod only)
+├── flow-logs.tf      ← VPC Flow Logs + IAM Role (apenas prod)
 └── outputs.tf        ← 8 outputs
 ```
 
 ---
 
-## 📥 Input Variables (Contract)
+##  Variáveis de Entrada (Contrato)
 
-The module receives only **4 variables** — a lean and well-defined contract:
+O módulo recebe apenas **4 variáveis** — um contrato enxuto e bem definido:
 
 ```hcl
 variable "tenant" {
-  description = "Tenant name (e.g., acme-corp, globo-saude)"
+  description = "Nome do tenant (ex: acme-corp, globo-saude)"
   type        = string
 }
 
 variable "environment" {
-  description = "Deployment environment (dev, staging, prod)"
+  description = "Ambiente de deploy (dev, staging, prod)"
   type        = string
 }
 
 variable "vpc" {
-  description = "VPC Configuration"
+  description = "Configuração da VPC"
   type = object({
-    cidr               = string           # E.g., "10.10.0.0/16"
-    azs                = list(string)     # E.g., ["us-east-1a", "us-east-1b"]
-    public_subnets     = list(string)     # E.g., ["10.10.1.0/24", "10.10.2.0/24"]
-    private_subnets    = list(string)     # E.g., ["10.10.10.0/24", "10.10.11.0/24"]
-    enable_nat_gateway = optional(bool, true)   # false = $0 in dev
-    single_nat_gateway = optional(bool, true)   # true = 1 NAT, false = 1 per AZ
+    cidr               = string           # Ex: "10.10.0.0/16"
+    azs                = list(string)     # Ex: ["us-east-1a", "us-east-1b"]
+    public_subnets     = list(string)     # Ex: ["10.10.1.0/24", "10.10.2.0/24"]
+    private_subnets    = list(string)     # Ex: ["10.10.10.0/24", "10.10.11.0/24"]
+    enable_nat_gateway = optional(bool, true)   # false = $0 em dev
+    single_nat_gateway = optional(bool, true)   # true = 1 NAT, false = 1 por AZ
   })
 }
 
 variable "tags" {
-  description = "Tags to apply to all resources"
+  description = "Tags para aplicar em todos os recursos"
   type        = map(string)
   default     = {}
 }
 ```
 
-### 📝 About the `object` type
+###  Sobre o tipo `object`
 
-Using `object` with `optional` is an advanced Terraform practice:
-- **`optional(bool, true)`** → If the variable is not passed, the default is `true`
-- Allows validation at `plan` time (strong typing)
-- Avoids individual variables — all VPC configurations are grouped together
+O uso de `object` com `optional` é uma prática avançada do Terraform:
+- **`optional(bool, true)`** → Se não passar a variável, o default é `true`
+- Permite validação em tempo de `plan` (tipagem forte)
+- Evita variáveis avulsas — todas as configs de VPC ficam agrupadas
 
 ---
 
-## 🔍 Detailed File Breakdown
+##  Detalhamento por Arquivo
 
 ### 1. `main.tf` — VPC + Internet Gateway
 
 ```hcl
-# Data sources for AWS information
+# Data sources para informações da AWS
 data "aws_availability_zones" "available" { state = "available" }
 data "aws_region" "current" {}
 
 locals {
-  name_prefix = "${var.tenant}-${var.environment}"    # E.g., "acme-corp-dev"
+  name_prefix = "${var.tenant}-${var.environment}"    # Ex: "acme-corp-dev"
   azs         = length(var.vpc.azs) > 0 ? var.vpc.azs : data.aws_availability_zones.available.names
 }
 ```
 
-**Important concepts:**
-- **`data.aws_availability_zones`**: Fetches available AZs automatically. If the user does not specify AZs, it uses all of them.
-- **`name_prefix`**: Naming pattern `{tenant}-{environment}` used across ALL resources
-- **`enable_dns_hostnames = true`**: Required for Interface VPC Endpoints and private DNS resolution
+**Conceitos importantes:**
+- **`data.aws_availability_zones`**: Busca AZs disponíveis automaticamente. Se o usuário não especificar AZs, usa todas.
+- **`name_prefix`**: Padrão de nomenclatura `{tenant}-{environment}` usado em TODOS os recursos
+- **`enable_dns_hostnames = true`**: Necessário para VPC Endpoints Interface e resolução DNS privada
 
 **VPC:**
-- Configurable CIDR per environment (e.g., `10.10.0.0/16`, `10.20.0.0/16`, `10.30.0.0/16`)
-- DNS enabled (required for EKS and VPC Endpoints)
-- Tags with tenant + environment for traceability
+- CIDR configurável por ambiente (ex: `10.10.0.0/16`, `10.20.0.0/16`, `10.30.0.0/16`)
+- DNS habilitado (necessário para EKS e VPC Endpoints)
+- Tags com tenant + environment para rastreabilidade
 
 **Internet Gateway:**
-- Allows public subnets to access the internet
-- Is a prerequisite for the NAT Gateway
+- Permite que subnets públicas acessem a internet
+- É pré-requisito para o NAT Gateway
 
 ---
 
-### 2. `subnets.tf` — Public and Private Subnets
+### 2. `subnets.tf` — Subnets Públicas e Privadas
 
 ```hcl
 resource "aws_subnet" "public" {
@@ -110,7 +110,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.this.id
   cidr_block              = var.vpc.public_subnets[count.index]
   availability_zone       = local.azs[count.index % length(local.azs)]
-  map_public_ip_on_launch = true     # ← Automatic public IP
+  map_public_ip_on_launch = true     # ← IP público automático
 }
 
 resource "aws_subnet" "private" {
@@ -121,56 +121,56 @@ resource "aws_subnet" "private" {
 }
 ```
 
-**AZ distribution using the `%` operator:**
+**Distribuição de AZs com operador `%`:**
 
 ```
-# With 3 subnets and 2 AZs:
+# Com 3 subnets e 2 AZs:
 # count.index=0 → AZ[0 % 2] = AZ[0] = us-east-1a
 # count.index=1 → AZ[1 % 2] = AZ[1] = us-east-1b
-# count.index=2 → AZ[2 % 2] = AZ[0] = us-east-1a  (wraps around)
+# count.index=2 → AZ[2 % 2] = AZ[0] = us-east-1a  (volta ao início)
 ```
 
-**Important tags:**
-- `Tier = "public"` or `Tier = "private"` → Used to filter subnets in the AWS Console
-- `Tenant` and `Environment` → Traceability and cost allocation
+**Tags importantes:**
+- `Tier = "public"` ou `Tier = "private"` → Usado para filtrar subnets no console AWS
+- `Tenant` e `Environment` → Rastreabilidade e cost allocation
 
 ---
 
-### 3. `nat-gateway.tf` — Conditional NAT Gateway
+### 3. `nat-gateway.tf` — NAT Gateway Condicional
 
-The NAT Gateway is the **most expensive** resource in the network (~$32/month + $0.045/GB).
+O NAT Gateway é o recurso **mais caro** da rede (~$32/mês + $0.045/GB).
 
 ```hcl
-# Elastic IP — always created (required for NAT)
+# Elastic IP — sempre criado (necessário para o NAT)
 resource "aws_eip" "nat" {
   count  = var.vpc.single_nat_gateway ? 1 : length(local.azs)
   domain = "vpc"
 }
 
-# NAT Gateway — conditional
+# NAT Gateway — condicional
 resource "aws_nat_gateway" "this" {
   count = var.vpc.enable_nat_gateway ? (
     var.vpc.single_nat_gateway ? 1 : length(local.azs)
-  ) : 0    # ← If enable_nat_gateway=false, creates ZERO NATs
+  ) : 0    # ← Se enable_nat_gateway=false, cria ZERO NATs
 }
 ```
 
-**`count` Logic:**
+**Lógica do `count`:**
 
-| `enable_nat_gateway` | `single_nat_gateway` | Outcome | Cost/month |
+| `enable_nat_gateway` | `single_nat_gateway` | Resultado | Custo/mês |
 |:--------------------:|:--------------------:|:---------:|:---------:|
-| `false` | any | **0 NATs** | $0 |
+| `false` | qualquer | **0 NATs** | $0 |
 | `true` | `true` | **1 NAT** | ~$32 |
-| `true` | `false` | **N NATs** (1 per AZ) | ~$96 (3 AZs) |
+| `true` | `false` | **N NATs** (1 por AZ) | ~$96 (3 AZs) |
 
-**`depends_on = [aws_internet_gateway.this]`** → The NAT requires the IGW to function. Without this, Terraform might try to create the NAT before the IGW.
+**`depends_on = [aws_internet_gateway.this]`** → O NAT precisa do IGW para funcionar. Sem isso, o Terraform pode tentar criar o NAT antes do IGW.
 
 ---
 
-### 4. `routing.tf` — Route Tables
+### 4. `routing.tf` — Tabelas de Rotas
 
 ```hcl
-# Public Route Table — 0.0.0.0/0 traffic goes to IGW
+# Route Table Pública — tráfego 0.0.0.0/0 vai pro IGW
 resource "aws_route_table" "public" {
   route {
     cidr_block = "0.0.0.0/0"
@@ -178,12 +178,12 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Private Route Tables — 0.0.0.0/0 traffic goes to NAT (if it exists)
+# Route Tables Privadas — tráfego 0.0.0.0/0 vai pro NAT (se existir)
 resource "aws_route_table" "private" {
   count = var.vpc.single_nat_gateway ? 1 : length(local.azs)
 
   dynamic "route" {
-    for_each = var.vpc.enable_nat_gateway ? [1] : []   # ← Conditional route
+    for_each = var.vpc.enable_nat_gateway ? [1] : []   # ← Rota condicional
     content {
       cidr_block     = "0.0.0.0/0"
       nat_gateway_id = var.vpc.single_nat_gateway ?
@@ -194,21 +194,21 @@ resource "aws_route_table" "private" {
 }
 ```
 
-**`dynamic "route"` block:**
-- If `enable_nat_gateway = false` → `for_each = []` → **no route is created**
-- If `enable_nat_gateway = true` → `for_each = [1]` → **1 route to the NAT**
+**Bloco `dynamic "route"`:**
+- Se `enable_nat_gateway = false` → `for_each = []` → **nenhuma rota é criada**
+- Se `enable_nat_gateway = true` → `for_each = [1]` → **1 rota para o NAT**
 
-**Associations:**
-- Each public subnet is associated with the public route table
-- Each private subnet is associated with the corresponding private route table (per AZ)
+**Associações:**
+- Cada subnet pública é associada à route table pública
+- Cada subnet privada é associada à route table privada correspondente (por AZ)
 
 ---
 
 ### 5. `endpoints.tf` — VPC Endpoints
 
-VPC Endpoints allow resources to access AWS services **without going through the internet**.
+VPC Endpoints permitem que recursos acessem serviços AWS **sem passar pela internet**.
 
-#### Gateway Endpoints (FREE — all environments)
+#### Gateway Endpoints (GRÁTIS — todos os ambientes)
 
 ```hcl
 resource "aws_vpc_endpoint" "s3" {
@@ -221,20 +221,20 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_vpc_endpoint" "dynamodb" {
-  # Same pattern as S3
+  # Mesmo padrão do S3
 }
 ```
 
-**Why Gateway Endpoints?**
-- **ZERO cost** — no hourly or GB charges
-- S3 and DynamoDB are the most accessed services (state, logs, cache)
-- Reduces traffic through the NAT Gateway (additional savings)
+**Por que Gateway Endpoints?**
+- **Custo ZERO** — não cobra por hora nem por GB
+- S3 e DynamoDB são os serviços mais acessados (state, logs, cache)
+- Reduz tráfego pelo NAT Gateway (economia adicional)
 
-#### Interface Endpoints (PROD ONLY — ~$7-20/month each)
+#### Interface Endpoints (APENAS PROD — ~$7-20/mês cada)
 
 ```hcl
 resource "aws_vpc_endpoint" "ecr_api" {
-  count = var.environment == "prod" ? 1 : 0   # ← Prod only
+  count = var.environment == "prod" ? 1 : 0   # ← Só em prod
 
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
@@ -243,27 +243,27 @@ resource "aws_vpc_endpoint" "ecr_api" {
 }
 ```
 
-| Endpoint | Service | Why in prod? |
+| Endpoint | Serviço | Por que em prod? |
 |---------|---------|-----------------|
-| `ecr.api` | ECR API | Docker image pull without internet |
-| `ecr.dkr` | ECR Docker | Docker layer pull without internet |
-| `logs` | CloudWatch Logs | Send logs without internet |
+| `ecr.api` | ECR API | Pull de imagens Docker sem internet |
+| `ecr.dkr` | ECR Docker | Pull de layers Docker sem internet |
+| `logs` | CloudWatch Logs | Envio de logs sem internet |
 
-**Endpoints Security Group:**
+**Security Group dos Endpoints:**
 ```hcl
 ingress {
   from_port   = 443
   to_port     = 443
   protocol    = "tcp"
-  cidr_blocks = [var.vpc.cidr]   # ← Only traffic from inside the VPC
+  cidr_blocks = [var.vpc.cidr]   # ← Apenas tráfego de dentro da VPC
 }
 ```
 
 ---
 
-### 6. `flow-logs.tf` — VPC Flow Logs (PROD ONLY)
+### 6. `flow-logs.tf` — VPC Flow Logs (APENAS PROD)
 
-Captures metadata for all network traffic in the VPC.
+Captura metadados de todo tráfego de rede na VPC.
 
 ```hcl
 resource "aws_flow_log" "this" {
@@ -276,32 +276,32 @@ resource "aws_flow_log" "this" {
 }
 ```
 
-**What is captured (example):**
+**O que é capturado (exemplo):**
 ```
 2 123456789012 eni-abc123 10.10.1.5 52.94.76.7 443 49152 6 25 20000 ACCEPT
-│ │            │          │         │          │   │     │ │  │     └─ Action (Accepted)
+│ │            │          │         │          │   │     │ │  │     └─ Aceito
 │ │            │          │         │          │   │     │ │  └─── Bytes
-│ │            │          │         │          │   │     │ └──── Packets
-│ │            │          │         │          │   │     └───── Protocol (TCP)
-│ │            │          │         │          │   └────────── Destination Port
-│ │            │          │         │          └─────────────── Source Port
-│ │            │          │         └──────────────────────── Destination IP
-│ │            │          └──────────────────────────────── Source IP
+│ │            │          │         │          │   │     │ └──── Pacotes
+│ │            │          │         │          │   │     └───── Protocolo (TCP)
+│ │            │          │         │          │   └────────── Porta destino
+│ │            │          │         │          └─────────────── Porta origem
+│ │            │          │         └──────────────────────── IP destino
+│ │            │          └──────────────────────────────── IP origem
 │ │            └─────────────────────────────────────────── ENI
 │ └──────────────────────────────────────────────────────── Account ID
-└────────────────────────────────────────────────────────── Version
+└────────────────────────────────────────────────────────── Versão
 ```
 
-**Dedicated IAM Role:**
-- Uses **least privilege** — CloudWatch Logs permissions only
-- `assume_role_policy` → Only the `vpc-flow-logs.amazonaws.com` service can assume it
+**IAM Role dedicada:**
+- Usa **mínimo privilégio** — apenas permissões de CloudWatch Logs
+- `assume_role_policy` → Apenas o serviço `vpc-flow-logs.amazonaws.com` pode assumir
 
 **CloudWatch Log Group:**
-- Retention: **90 days** (cost-efficient for compliance)
+- Retenção: **90 dias** (custo-eficiente para compliance)
 
 ---
 
-### 7. `outputs.tf` — Exported Values
+### 7. `outputs.tf` — Valores Exportados
 
 ```hcl
 output "vpc_id"               { value = aws_vpc.this.id }
@@ -314,11 +314,11 @@ output "internet_gateway_id"  { value = aws_internet_gateway.this.id }
 output "vpc_flow_log_group"   { value = try(aws_cloudwatch_log_group.flow_logs[0].name, "") }
 ```
 
-**Note:** The use of `try()` ensures that the output returns an empty value (`[]` or `""`) when the resource does not exist (e.g., NAT disabled in dev).
+**Nota:** O uso de `try()` garante que o output retorna um valor vazio (`[]` ou `""`) quando o recurso não existe (ex: NAT desabilitado em dev).
 
 ---
 
-## 📐 Network Diagram
+##  Diagrama de Rede
 
 ```
 ┌─────────────────────────────── VPC (10.x.0.0/16) ───────────────────────────────┐
@@ -339,19 +339,19 @@ output "vpc_flow_log_group"   { value = try(aws_cloudwatch_log_group.flow_logs[0
 │   └─────────────────────────┘  └─────────────────────────┘  └─────────────────┘│
 │                                                                                  │
 │   ┌─── VPC Endpoints ──────────────────────────────────────────────────────────┐│
-│   │ S3 (Gateway) ✅ FREE    DynamoDB (Gateway) ✅ FREE                         ││
-│   │ ECR (Interface) 🔒 PROD  Logs (Interface) 🔒 PROD                         ││
+│   │ S3 (Gateway)  FREE    DynamoDB (Gateway)  FREE                         ││
+│   │ ECR (Interface)  PROD  Logs (Interface)  PROD                         ││
 │   └────────────────────────────────────────────────────────────────────────────┘│
 │                                                                                  │
 │   ┌─── Internet Gateway ────┐     ┌─── Flow Logs ────────────────────────────┐ │
-│   │ Public → Pub Subnets    │     │ 🔒 PROD ONLY → CloudWatch (90 days)     │ │
+│   │ Público → Subnets pub   │     │  PROD ONLY → CloudWatch (90 dias)     │ │
 │   └──────────────────────────┘     └──────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🧪 Usage Example
+##  Exemplo de Uso
 
 ```hcl
 module "tenant_network" {
@@ -365,7 +365,7 @@ module "tenant_network" {
     azs                = ["us-east-1a", "us-east-1b"]
     public_subnets     = ["10.10.1.0/24", "10.10.2.0/24"]
     private_subnets    = ["10.10.10.0/24", "10.10.11.0/24"]
-    enable_nat_gateway = false    # Dev: no NAT = $0
+    enable_nat_gateway = false    # Dev: sem NAT = $0
     single_nat_gateway = true
   }
   
@@ -378,21 +378,21 @@ module "tenant_network" {
 
 ---
 
-## 🧠 Concepts to Study
+##  Conceitos para Estudar
 
-| Concept | What it is | Relevance |
+| Conceito | O que é | Relevância |
 |---------|---------|-----------|
-| **VPC** | Virtual Private Cloud — isolated network in AWS | Foundation of all infrastructure |
-| **CIDR** | Classless Inter-Domain Routing — range of IPs | Defines network size |
-| **Subnets** | Subdivisions of the VPC in AZs | Load distribution |
-| **NAT Gateway** | Allows internet access for private subnets | Most expensive resource |
-| **IGW** | Internet Gateway — gateway for public traffic | Required for public subnets |
-| **Route Tables** | Rules for routing traffic | Flow control |
-| **VPC Endpoints** | Direct access to AWS services without internet | Security + savings |
-| **Flow Logs** | Captures network traffic metadata | Audit/compliance |
-| **`count` vs `for_each`** | Create N resources dynamically | Terraform pattern |
-| **`dynamic` blocks** | Generate HCL blocks conditionally | Conditional routes |
+| **VPC** | Virtual Private Cloud — rede isolada na AWS | Base de toda infraestrutura |
+| **CIDR** | Classless Inter-Domain Routing — range de IPs | Define tamanho da rede |
+| **Subnets** | Subdivisões da VPC em AZs | Distribuição de carga |
+| **NAT Gateway** | Permite acesso internet para subnets privadas | Recurso mais caro |
+| **IGW** | Internet Gateway — porta de entrada para tráfego público | Necessário para público |
+| **Route Tables** | Regras de roteamento de tráfego | Controle de fluxo |
+| **VPC Endpoints** | Acesso direto a serviços AWS sem internet | Segurança + economia |
+| **Flow Logs** | Captura metadata de tráfego de rede | Auditoria/compliance |
+| **`count` vs `for_each`** | Criar N recursos dinamicamente | Padrão Terraform |
+| **`dynamic` blocks** | Gerar blocos HCL condicionalmente | Rotas condicionais |
 
 ---
 
-[← Back to main README](../../../README.md)
+[← Voltar ao README principal](../../../README.pt-br.md)

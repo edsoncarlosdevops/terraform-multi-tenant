@@ -1,8 +1,8 @@
-# 🔧 GitHub Actions + AWS Setup
+#  Configuração GitHub Actions + AWS
 
-## 1. Create IAM Role for GitHub Actions
+## 1. Criar IAM Role para GitHub Actions
 
-Access the AWS Console > IAM > Roles > Create Role.
+Acesse o console AWS > IAM > Roles > Create Role.
 
 ### Trust Policy (OIDC)
 ```json
@@ -25,7 +25,7 @@ Access the AWS Console > IAM > Roles > Create Role.
 }
 ```
 
-### Step-by-step in the console:
+### Passo a passo no console:
 1. IAM > Identity Providers > Add Provider
 2. Provider Type: OpenID Connect
 3. Provider URL: `https://token.actions.githubusercontent.com`
@@ -34,47 +34,47 @@ Access the AWS Console > IAM > Roles > Create Role.
    - Trusted entity type: Web identity
    - Identity provider: `token.actions.githubusercontent.com`
    - Audience: `sts.amazonaws.com`
-   - GitHub organization: `YOUR_USERNAME`
+   - GitHub organization: `SEU_USUARIO`
    - GitHub repository: `terraform-multi-tenant`
-6. Attach Policy: `AdministratorAccess` (or a more restrictive custom policy)
+6. Attach Policy: `AdministratorAccess` (ou uma custom mais restrita)
 7. Role name: `github-actions-terraform`
 
-## 2. Secrets in GitHub
+## 2. Secrets no GitHub
 
 Settings > Secrets and variables > Actions > New repository secret:
 
-| Secret | Value |
+| Secret | Valor |
 |--------|-------|
-| `AWS_ACCOUNT_ID` | Your AWS Account ID (12 digits) |
-| `SLACK_WEBHOOK` | (optional) Slack Webhook |
-| `INFRACOST_API_KEY` | (optional) Infracost API key |
+| `AWS_ACCOUNT_ID` | Seu ID da conta AWS (12 dígitos) |
+| `SLACK_WEBHOOK` | (opcional) Webhook do Slack |
+| `INFRACOST_API_KEY` | (opcional) API key do Infracost |
 
-## 3. Environments in GitHub
+## 3. Environments no GitHub
 
 Settings > Environments > New Environment:
 
 ### dev
-- No protection rules (automatic deploy)
+- Sem protection rules (deploy automático)
 
 ### staging
-- Required reviewers: add your user
-- Wait timer: 0 minutes
+- Required reviewers: adicione seu usuario
+- Wait timer: 0 minutos
 
 ### prod
-- Required reviewers: add your user
-- Wait timer: 10 minutes (delay before applying)
+- Required reviewers: adicione seu usuario
+- Wait timer: 10 minutos (delay antes de aplicar)
 
-## 4. Testing
+## 4. Testando
 
 ```bash
-# 1. Create a branch
+# 1. Crie um branch
 git checkout -b test/ci
 
-# 2. Do something simple (change a tag)
-# 3. Commit and push
+# 2. Algo simples (mude uma tag)
+# 3. Commit e push
 git add . && git commit -m "test: ci pipeline" && git push origin test/ci
 
-# 4. Open a PR on GitHub
-# 5. See the checks running
-# 6. Merge once everything passes
+# 4. Abra PR no GitHub
+# 5. Veja os checks rodando
+# 6. Merge quando tudo passar
 ```

@@ -1,33 +1,33 @@
-# ⚙️ CI/CD — GitHub Actions Workflows
+# ️ CI/CD — GitHub Actions Workflows
 
-[← Back to main README](../../README.md)
-
----
-
-## 📋 Overview
-
-The project uses **3 GitHub Actions workflows** covering the entire lifecycle:
-
-```
-PR created → CI (quality + security + plan)
-PR merged  → CD (versioning + apply + notification)
-Sunday     → Security Weekly (DAST on cluster)
-```
+[← Voltar ao README principal](../../README.pt-br.md)
 
 ---
 
-## 📁 Files
+##  Visão Geral
+
+O projeto usa **3 workflows** do GitHub Actions que cobrem todo o ciclo de vida:
+
+```
+PR criado → CI (qualidade + segurança + plan)
+PR merged → CD (versionamento + apply + notificação)
+Domingo   → Security Weekly (DAST no cluster)
+```
+
+---
+
+##  Arquivos
 
 ```
 .github/workflows/
-├── ci.yml                 ← Unified CI: fmt + lint + SAST + plan
-├── cd.yml                 ← Unified CD: tag + apply + Slack
-└── security-weekly.yml    ← Weekly DAST: kube-bench + Popeye + Kubescape
+├── ci.yml                 ← CI unificado: fmt + lint + SAST + plan
+├── cd.yml                 ← CD unificado: tag + apply + Slack
+└── security-weekly.yml    ← DAST semanal: kube-bench + Popeye + Kubescape
 ```
 
 ---
 
-## 🟢 Workflow 1: CI (`ci.yml`)
+##  Workflow 1: CI (`ci.yml`)
 
 ### Trigger
 
@@ -41,16 +41,16 @@ on:
       - 'bootstrap/**'
 ```
 
-**Only runs when:** Infrastructure files change in a PR to `main`.
+**Só roda quando:** Arquivos de infra mudam em um PR para `main`.
 
-### Permissions
+### Permissões
 
 ```yaml
 permissions:
-  id-token: write        # OIDC to assume AWS role
-  contents: read         # Read code
-  pull-requests: write   # Comment on PR
-  security-events: write # Upload SARIF to GitHub Security
+  id-token: write        # OIDC para assumir role AWS
+  contents: read         # Ler código
+  pull-requests: write   # Comentar no PR
+  security-events: write # Upload SARIF para GitHub Security
 ```
 
 ### Pipeline
@@ -60,27 +60,27 @@ permissions:
 │                      Job: quality                               │
 │                                                                  │
 │  ┌──────────────────┐                                           │
-│  │ 1. terraform fmt  │ ← Verifies formatting                    │
+│  │ 1. terraform fmt  │ ← Verifica formatação                    │
 │  │    -check         │   continue-on-error: true                │
 │  └────────┬─────────┘                                           │
 │           │                                                      │
 │  ┌────────▼─────────┐                                           │
-│  │ 2. TFLint         │ ← Best practices lint                    │
-│  │    --format compact│   continue-on-error: true                │
+│  │ 2. TFLint         │ ← Lint de best practices                │
+│  │    --format compact│   continue-on-error: true               │
 │  └────────┬─────────┘                                           │
 │           │                                                      │
 │  ┌────────▼──────────────┐                                      │
-│  │ 3. Checkov (IaC)      │ ← Misconfiguration scan               │
-│  │    → checkov.sarif     │   Upload to GitHub Security          │
+│  │ 3. Checkov (IaC)      │ ← Scan de misconfigurations          │
+│  │    → checkov.sarif     │   Upload para GitHub Security        │
 │  └────────┬──────────────┘                                      │
 │           │                                                      │
 │  ┌────────▼──────────────┐                                      │
-│  │ 4. Trivy (filesystem) │ ← Vulns + misconfigs + secrets        │
-│  │    → trivy.sarif       │   Severity: HIGH, CRITICAL               │
+│  │ 4. Trivy (filesystem) │ ← Vuln + misconfig + secrets         │
+│  │    → trivy.sarif       │   Severity: HIGH, CRITICAL           │
 │  └────────┬──────────────┘                                      │
 │           │                                                      │
 │  ┌────────▼──────────────┐                                      │
-│  │ 5. Gitleaks (secrets) │ ← Secrets scan in code/commits        │
+│  │ 5. Gitleaks (secrets) │ ← Scan de secrets no código/commits  │
 │  └───────────────────────┘                                      │
 └──────────────────────────────┬──────────────────────────────────┘
                                 │ needs: quality
@@ -90,55 +90,55 @@ permissions:
 │              fail-fast: false                                    │
 │                                                                  │
 │  ┌──────────────────┐                                           │
-│  │ terraform init    │ ← -backend=false (no AWS credentials)    │
+│  │ terraform init    │ ← -backend=false (sem creds AWS)         │
 │  │    -backend=false │                                          │
 │  └────────┬─────────┘                                           │
 │           │                                                      │
 │  ┌────────▼─────────┐                                           │
-│  │ terraform validate│ ← Syntax validation                      │
+│  │ terraform validate│ ← Validação de sintaxe                   │
 │  └────────┬─────────┘                                           │
 │           │                                                      │
 │  ┌────────▼─────────┐                                           │
-│  │ terraform plan    │ ← Plan without applying                  │
+│  │ terraform plan    │ ← Plan sem aplicar                       │
 │  │    -no-color      │   continue-on-error: true                │
 │  └────────┬─────────┘                                           │
 │           │                                                      │
 │  ┌────────▼──────────────────────────────────────────────────┐  │
-│  │ Comment on PR:                                             │  │
-│  │  ## 🤖 Plan - `dev`                                       │  │
+│  │ Comentário no PR:                                          │  │
+│  │  ##  Plan - `dev`                                       │  │
 │  │  <details><summary>Show Plan</summary>                     │  │
 │  │  ```terraform                                              │  │
-│  │  ... plan output ...                                       │  │
+│  │  ... output do plan ...                                    │  │
 │  │  ```                                                       │  │
 │  │  </details>                                                │  │
-│  │  ✅ Plan succeeded                                         │  │
+│  │   Plan succeeded                                         │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### Technical Details
+### Detalhes Técnicos
 
-**`-backend=false` in CI:**
-- CI doesn't have AWS credentials in the `quality` job (they are expensive and unnecessary)
-- `terraform init -backend=false` initializes without connecting to S3
-- `terraform validate` works without a backend
+**`-backend=false` no CI:**
+- O CI não tem credenciais AWS no job `quality` (são caras e desnecessárias)
+- `terraform init -backend=false` inicializa sem conectar ao S3
+- `terraform validate` funciona sem backend
 
 **`continue-on-error: true`:**
-- No security tool **blocks** the PR
-- These are informational checks for human review
-- To block, remove `continue-on-error`
+- Nenhuma ferramenta de segurança **bloqueia** o PR
+- São checks informativos para revisão humana
+- Para bloquear, remova o `continue-on-error`
 
 **Matrix strategy:**
 ```yaml
 strategy:
   matrix:
     environment: [dev, staging, prod]
-  fail-fast: false    # ← Runs ALL even if one fails
+  fail-fast: false    # ← Roda TODOS mesmo se um falhar
 ```
 
 ---
 
-## 🔵 Workflow 2: CD (`cd.yml`)
+##  Workflow 2: CD (`cd.yml`)
 
 ### Trigger
 
@@ -152,7 +152,7 @@ on:
       - 'bootstrap/**'
 ```
 
-**Only runs when:** Merge to `main` with infrastructure changes.
+**Só roda quando:** Merge para `main` com mudanças em infra.
 
 ### Pipeline
 
@@ -161,12 +161,12 @@ on:
 │                      Job: version                                │
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────────┐   │
-│  │ 1. Calculate SemVer                                       │   │
+│  │ 1. Calcula SemVer                                         │   │
 │  │    LAST_TAG = git describe --tags --abbrev=0              │   │
-│  │    If v0.0.0 → v0.1.0                                    │   │
-│  │    Else → v{major}.{minor}.{patch+1}                      │   │
+│  │    Se v0.0.0 → v0.1.0                                    │   │
+│  │    Senão → v{major}.{minor}.{patch+1}                     │   │
 │  │                                                           │   │
-│  │ 2. Create annotated tag                                   │   │
+│  │ 2. Cria tag anotada                                       │   │
 │  │    git tag -a v1.2.4 -m "Release v1.2.4"                 │   │
 │  │    git push origin v1.2.4                                  │   │
 │  └───────────────────────────────────────────────────────────┘   │
@@ -182,7 +182,7 @@ on:
 │  ┌───────────────────────────────────────────────────────────┐   │
 │  │ 1. Detect Changes                                         │   │
 │  │    git diff HEAD~1...HEAD | grep environments/dev/        │   │
-│  │    → changed=true or changed=false                        │   │
+│  │    → changed=true ou changed=false                        │   │
 │  └────────┬──────────────────────────────────────────────────┘   │
 │           │ if changed=true                                       │
 │  ┌────────▼──────────────────────────────────────────────────┐   │
@@ -192,26 +192,26 @@ on:
 │           │                                                       │
 │  ┌────────▼──────────────────────────────────────────────────┐   │
 │  │ 3. terraform init + apply -auto-approve                    │   │
-│  │    TF_VAR_infra_version = v1.2.4  ← From version step     │   │
+│  │    TF_VAR_infra_version = v1.2.4  ← Da etapa version      │   │
 │  └────────┬──────────────────────────────────────────────────┘   │
 │           │                                                       │
 │  ┌────────▼──────────────────────────────────────────────────┐   │
 │  │ 4. Slack Notification                                      │   │
-│  │    🚀 Deploy - `dev`                                       │   │
-│  │    Version: v1.2.4                                         │   │
+│  │     Deploy - `dev`                                       │   │
+│  │    Versão: v1.2.4                                          │   │
 │  │    Status: success                                         │   │
 │  └───────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### Technical Details
+### Detalhes Técnicos
 
 **Detect Changes:**
 ```bash
 CHANGED=$(git diff --name-only HEAD~1...HEAD | grep "^environments/dev/" || echo "")
 ```
-- Compares the last commit with the previous one
-- If no files in the environment have changed, it **skips the deploy** (saves time and money)
+- Compara o último commit com o anterior
+- Se nenhum arquivo do ambiente mudou, **pula o deploy** (economia de tempo e dinheiro)
 
 **OIDC Authentication:**
 ```yaml
@@ -219,37 +219,37 @@ CHANGED=$(git diff --name-only HEAD~1...HEAD | grep "^environments/dev/" || echo
   with:
     role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
 ```
-- **No access keys!** Uses OIDC (OpenID Connect) to assume an IAM Role
-- More secure than access keys (no secrets to leak)
-- See [docs/github-actions-setup.md](../github-actions-setup.md) for configuration
+- **Sem chaves de acesso!** Usa OIDC (OpenID Connect) para assumir uma IAM Role
+- Mais seguro que access keys (sem segredo para vazar)
+- Ver [docs/github-actions-setup.pt-br.md](../github-actions-setup.pt-br.md) para configuração
 
 **`TF_VAR_infra_version`:**
 ```yaml
 env:
   TF_VAR_infra_version: ${{ needs.version.outputs.new_tag }}
 ```
-- The tag version is passed as an environment variable to Terraform
-- It appears in the labels/annotations of the resources (traceability)
+- A versão da tag é passada como variável de ambiente para o Terraform
+- Aparece nos labels/annotations dos recursos (rastreabilidade)
 
 **Environment protection rules:**
 
-| Environment | Protection | Behavior |
+| Ambiente | Proteção | Comportamento |
 |---------|----------|--------------|
-| `dev` | None | Automatic deploy on merge |
-| `staging` | Required reviewers | Requires manual approval |
-| `prod` | Required reviewers + Wait timer | Approval + 10 min wait time |
+| `dev` | Nenhuma | Deploy automático no merge |
+| `staging` | Required reviewers | Precisa aprovação manual |
+| `prod` | Required reviewers + Wait timer | Aprovação + 10 min de espera |
 
 ---
 
-## 🔴 Workflow 3: Security Weekly (`security-weekly.yml`)
+##  Workflow 3: Security Weekly (`security-weekly.yml`)
 
 ### Trigger
 
 ```yaml
 on:
   schedule:
-    - cron: '0 8 * * 0'    # Sunday at 8 AM UTC
-  workflow_dispatch:         # Can be run manually
+    - cron: '0 8 * * 0'    # Domingo às 8h UTC
+  workflow_dispatch:         # Pode rodar manualmente
 ```
 
 ### Pipeline
@@ -261,35 +261,35 @@ on:
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │ 1. kube-bench (CIS Kubernetes Benchmark)                  │   │
-│  │    - Runs ephemeral pod in the cluster                    │   │
-│  │    - Verifies compliance with CIS benchmarks              │   │
-│  │    - Output: JSON with passes/fails per section           │   │
+│  │    - Roda pod efêmero no cluster                          │   │
+│  │    - Verifica compliance com CIS benchmarks               │   │
+│  │    - Output: JSON com passes/fails por seção              │   │
 │  └────────┬─────────────────────────────────────────────────┘   │
 │           │                                                      │
 │  ┌────────▼─────────────────────────────────────────────────┐   │
-│  │ 2. Popeye (Cluster Sanity)                                │   │
-│  │    - Analyzes cluster resources                           │   │
-│  │    - Detects: pods without limits, latest images, etc.    │   │
-│  │    - Output: HTML report                                  │   │
+│  │ 2. Popeye (Sanidade do Cluster)                           │   │
+│  │    - Analisa recursos do cluster                          │   │
+│  │    - Detecta: pods sem limits, images latest, etc.        │   │
+│  │    - Output: HTML report                                   │   │
 │  └────────┬─────────────────────────────────────────────────┘   │
 │           │                                                      │
 │  ┌────────▼─────────────────────────────────────────────────┐   │
 │  │ 3. Kubescape (NSA/CISA Framework)                         │   │
-│  │    - Verifies compliance with NSA/CISA framework          │   │
-│  │    - Output: SARIF → GitHub Security tab                  │   │
+│  │    - Verifica compliance com framework NSA/CISA            │   │
+│  │    - Output: SARIF → GitHub Security tab                   │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### DAST Tools
+### Ferramentas DAST
 
-| Tool | What it checks | Format |
+| Ferramenta | O que verifica | Formato |
 |-----------|---------------|---------|
-| **kube-bench** | CIS Benchmark (cluster configurations) | JSON in Step Summary |
-| **Popeye** | Misconfigured resources (pods, services, etc) | HTML report |
-| **Kubescape** | NSA/CISA framework + MITRE ATT&CK | SARIF → GitHub Security |
+| **kube-bench** | CIS Benchmark (configurações do cluster) | JSON no Step Summary |
+| **Popeye** | Recursos mal configurados (pods, services, etc) | HTML report |
+| **Kubescape** | Framework NSA/CISA + MITRE ATT&CK | SARIF → GitHub Security |
 
-**kube-bench example output:**
+**kube-bench exemplo de output:**
 ```
 [PASS] 1.1.1 Ensure that the API server pod specification file permissions are set to 644
 [FAIL] 1.1.2 Ensure that the API server pod specification file ownership is root:root
@@ -298,17 +298,17 @@ on:
 
 ---
 
-## 🔐 Required Secrets
+##  Secrets Necessários
 
-| Secret | Required | Where to configure |
+| Secret | Obrigatório | Onde configurar |
 |--------|:-----------:|:---------------|
-| `AWS_ACCOUNT_ID` | ✅ | Settings → Secrets → Actions |
-| `SLACK_WEBHOOK` | ❌ | Settings → Secrets → Actions |
-| `INFRACOST_API_KEY` | ❌ | Settings → Secrets → Actions |
+| `AWS_ACCOUNT_ID` |  | Settings → Secrets → Actions |
+| `SLACK_WEBHOOK` |  | Settings → Secrets → Actions |
+| `INFRACOST_API_KEY` |  | Settings → Secrets → Actions |
 
 ---
 
-## 📐 Full Flow
+##  Fluxo Completo
 
 ```
      ┌────────────────────────────────────────────────────┐
@@ -316,29 +316,29 @@ on:
      └────────────────────────────────────────────────────┘
 
      1. git checkout -b feature/add-tenant
-     2. Edit modules/ or environments/
+     2. Edita modules/ ou environments/
      3. git push origin feature/add-tenant
-     4. Open PR to main
+     4. Abre PR para main
                 │
                 ▼
      ┌─────────────────────┐
      │     CI Workflow      │
      │  fmt → lint → SAST  │
      │  plan (dev/stg/prod)│
-     │  Comment on PR      │
+     │  Comentário no PR   │
      └─────────┬───────────┘
                │
                ▼
      ┌─────────────────────┐
      │   Code Review        │
-     │   Verify plan        │
-     │   Verify costs       │
-     │   Verify security    │
+     │   Verifica plan      │
+     │   Verifica custos    │
+     │   Verifica segurança │
      └─────────┬───────────┘
-               │ Approved ✅
+               │ Aprovado 
                ▼
      ┌─────────────────────┐
-     │   Merge to main      │
+     │   Merge para main    │
      └─────────┬───────────┘
                │
                ▼
@@ -346,38 +346,38 @@ on:
      │     CD Workflow      │
      │  Tag: v1.2.4         │
      │  Apply: dev (auto)   │
-     │  Apply: stg (manual) │ ← Requires approval
-     │  Apply: prod (manual)│ ← Requires approval + 10min
-     │  Slack: ✅ Deploy     │
+     │  Apply: stg (manual) │ ← Precisa aprovação
+     │  Apply: prod (manual)│ ← Precisa aprovação + 10min
+     │  Slack:  Deploy     │
      └─────────────────────┘
 
-     ... Sunday 8 AM UTC ...
+     ... Domingo 8h UTC ...
 
      ┌─────────────────────┐
      │  Security Weekly     │
      │  kube-bench → CIS   │
-     │  Popeye → Sanity    │
+     │  Popeye → Sanidade  │
      │  Kubescape → NSA    │
      └─────────────────────┘
 ```
 
 ---
 
-## 🧠 Concepts to Study
+##  Conceitos para Estudar
 
-| Concept | What it is | Relevance |
+| Conceito | O que é | Relevância |
 |---------|---------|-----------|
-| **GitHub Actions** | GitHub's native CI/CD | Pipeline automation |
-| **OIDC** | OpenID Connect — passwordless auth | AWS Security |
-| **SARIF** | Static Analysis Results Interchange Format | Security results standard |
-| **Matrix strategy** | Run jobs in parallel for N combinations | Plan per environment |
-| **Environment protection** | Approval rules for deploys | Governance |
-| **SemVer** | Semantic Versioning (major.minor.patch) | Versioning |
-| **CIS Benchmark** | Security standard from Center for Internet Security | Compliance |
-| **SAST vs DAST** | Static vs Dynamic Application Security Testing | Security |
-| **Checkov** | IaC scanner (Terraform, K8s, Docker) | SAST |
-| **Trivy** | Multi-purpose vulnerability scanner | SAST |
+| **GitHub Actions** | CI/CD nativo do GitHub | Automação de pipelines |
+| **OIDC** | OpenID Connect — auth sem senhas | Segurança na AWS |
+| **SARIF** | Static Analysis Results Interchange Format | Padrão de resultados de segurança |
+| **Matrix strategy** | Executar jobs em paralelo para N combinações | Plan por ambiente |
+| **Environment protection** | Regras de aprovação para deploys | Governance |
+| **SemVer** | Semantic Versioning (major.minor.patch) | Versionamento |
+| **CIS Benchmark** | Padrão de segurança da Center for Internet Security | Compliance |
+| **SAST vs DAST** | Static vs Dynamic Application Security Testing | Segurança |
+| **Checkov** | Scanner de IaC (Terraform, K8s, Docker) | SAST |
+| **Trivy** | Scanner de vulnerabilidades multi-propósito | SAST |
 
 ---
 
-[← Back to main README](../../README.md)
+[← Voltar ao README principal](../../README.pt-br.md)

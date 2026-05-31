@@ -1,155 +1,155 @@
-#  Scripts Utilitários
+# 📜 Utility Scripts
 
-[← Voltar ao README principal](../../README.md)
+[← Back to main README](../../README.md)
 
 ---
 
-##  Visão Geral
+## 📋 Overview
 
-O projeto inclui 2 scripts utilitários para auxiliar no setup inicial e no versionamento local:
+The project includes 2 utility scripts to assist with the initial setup and local versioning:
 
 ```
 scripts/
-├── setup-github.sh   ← Prepara o repo para o primeiro push
-└── version.sh        ← Versionamento SemVer local
+├── setup-github.sh   ← Prepares the repo for the first push
+└── version.sh        ← Local SemVer versioning
 ```
 
 ---
 
-##  Script 1: `setup-github.sh`
+## 🔧 Script 1: `setup-github.sh`
 
-### Propósito
+### Purpose
 
-Prepara o repositório local para o primeiro push no GitHub. Automatiza verificações que deveriam ser feitas manualmente.
+Prepares the local repository for the first push to GitHub. It automates checks that would otherwise have to be done manually.
 
-### Uso
+### Usage
 
 ```bash
 ./scripts/setup-github.sh
 ```
 
-### O que faz (4 etapas)
+### What it does (4 steps)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  [1/4] Verificando Git...                               │
-│   Git OK                                              │
-│  (ou ️ com instruções para criar o repo)               │
+│  [1/4] Checking Git...                                  │
+│  ✅ Git OK                                              │
+│  (or ⚠️ with instructions to create the repo)            │
 ├─────────────────────────────────────────────────────────┤
-│  [2/4] Formatando código Terraform...                   │
+│  [2/4] Formatting Terraform code...                     │
 │  terraform fmt -recursive                               │
-│   Formatação concluída                                │
+│  ✅ Formatting completed                                │
 ├─────────────────────────────────────────────────────────┤
-│  [3/4] Validando sintaxe (sem AWS)...                   │
+│  [3/4] Validating syntax (without AWS)...               │
 │  terraform init -backend=false                          │
 │  terraform validate                                     │
-│   dev - OK                                            │
-│   staging - OK                                        │
-│   prod - OK                                           │
+│  ✅ dev - OK                                            │
+│  ✅ staging - OK                                        │
+│  ✅ prod - OK                                           │
 ├─────────────────────────────────────────────────────────┤
-│  [4/4] Resumo do que vai subir:                         │
-│                                                          │
-│   Estrutura:                                          │
+│  [4/4] Summary of what will be pushed:                  │
+│                                                         │
+│  📁 Structure:                                          │
 │  ├── bootstrap/          (S3 + DynamoDB)                │
 │  ├── modules/                                           │
 │  │   ├── tenant-network/ (VPC + subnets + NAT)          │
 │  │   ├── tenant-eks/     (Cluster + NodeGroup)          │
 │  │   └── tenant-argocd/  (ArgoCD + AppSets)             │
 │  ├── environments/                                      │
-│  │   ├── dev/            (custo zero)                   │
-│  │   ├── staging/        (balanceado)                   │
+│  │   ├── dev/            (zero cost)                    │
+│  │   ├── staging/        (balanced)                     │
 │  │   └── prod/           (HA)                           │
 │  └── .github/workflows/  (pipelines)                    │
-│                                                          │
-│   Secrets necessários no GitHub:                      │
+│                                                         │
+│  🔑 Required Secrets in GitHub:                         │
 │     - AWS_ACCOUNT_ID                                    │
-│     - SLACK_WEBHOOK (opcional)                          │
-│     - INFRACOST_API_KEY (opcional)                      │
-│                                                          │
-│   IAM Role necessária na AWS:                        │
+│     - SLACK_WEBHOOK (optional)                          │
+│     - INFRACOST_API_KEY (optional)                      │
+│                                                         │
+│  🔧 Required IAM Role in AWS:                           │
 │     - github-actions-terraform                          │
-│                                                          │
+│                                                         │
 │  ════════════════════════════════════════                │
-│  PRONTO PARA SUBIR!                                     │
+│  READY TO PUSH!                                         │
 │  ════════════════════════════════════════                │
-│                                                          │
-│  Comandos:                                              │
+│                                                         │
+│  Commands:                                              │
 │    git add .                                            │
-│    git commit -m 'feat: infra multi-tenant completa'    │
+│    git commit -m 'feat: complete multi-tenant infra'    │
 │    git push -u origin main                              │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Detalhes Técnicos
+### Technical Details
 
 ```bash
-set -euo pipefail    # ← Aborta em qualquer erro
+set -euo pipefail    # ← Aborts on any error
 ```
 
-| Flag | Significado |
+| Flag | Meaning |
 |------|-----------|
-| `-e` | Exit on error — qualquer comando que falhar para o script |
-| `-u` | Unset variables — usar variável não declarada é erro |
-| `-o pipefail` | Pipe fail — se qualquer comando em um pipe falhar, todo o pipe falha |
+| `-e` | Exit on error — any command that fails stops the script |
+| `-u` | Unset variables — using an undeclared variable is an error |
+| `-o pipefail` | Pipe fail — if any command in a pipe fails, the entire pipe fails |
 
-**`terraform init -backend=false`** — Inicializa sem conectar ao S3 backend. Permite validar sintaxe sem credenciais AWS.
+**`terraform init -backend=false`** — Initializes without connecting to the S3 backend. Allows syntax validation without AWS credentials.
 
-**`terraform validate`** — Verifica se a sintaxe está correta sem criar nenhum recurso.
+**`terraform validate`** — Checks if the syntax is correct without creating any resources.
 
 ---
 
-## ️ Script 2: `version.sh`
+## 🏷️ Script 2: `version.sh`
 
-### Propósito
+### Purpose
 
-Gerencia versionamento SemVer (Semantic Versioning) local. Permite ver, calcular e criar tags sem usar o CI/CD.
+Manages local SemVer (Semantic Versioning) versioning. Allows viewing, calculating, and creating tags without using CI/CD.
 
-### Uso
+### Usage
 
 ```bash
-# Ver versão atual
+# View current version
 ./scripts/version.sh current
 
-# Ver próxima versão (sem criar)
+# View next version (without creating)
 ./scripts/version.sh next
 
-# Criar e enviar a tag
+# Create and push the tag
 ./scripts/version.sh tag
 
-# Ajuda
+# Help
 ./scripts/version.sh help
 ```
 
-### Exemplos de Output
+### Output Examples
 
 ```bash
 $ ./scripts/version.sh current
- Versão atual: v1.2.3
- Commit:       abc1234
+📌 Current version: v1.2.3
+🔑 Commit:          abc1234
 
 $ ./scripts/version.sh next
- Última tag:  v1.2.3
- Próxima tag: v1.2.4
+📌 Last tag:     v1.2.3
+📦 Next tag:     v1.2.4
 
-Para aplicar com essa versão:
+To apply with this version:
   export TF_VAR_infra_version=v1.2.4
   terraform apply
 
 $ ./scripts/version.sh tag
-️ Criando tag v1.2.4...
- Tag v1.2.4 criada e enviada!
+🏷️ Creating tag v1.2.4...
+✅ Tag v1.2.4 created and pushed!
 ```
 
-### Funções Internas
+### Internal Functions
 
 ```bash
 get_last_tag() {
   git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"
 }
 ```
-- `git describe --tags --abbrev=0` → Retorna a tag anotada mais recente
-- `2>/dev/null` → Suprime erro se não existir nenhuma tag
-- `|| echo "v0.0.0"` → Fallback para v0.0.0 se não houver tags
+- `git describe --tags --abbrev=0` → Returns the most recent annotated tag
+- `2>/dev/null` → Suppresses the error if no tag exists
+- `|| echo "v0.0.0"` → Fallback to v0.0.0 if there are no tags
 
 ```bash
 get_next_version() {
@@ -161,71 +161,71 @@ get_next_version() {
 }
 ```
 
-**Parsing da versão:**
+**Version parsing:**
 ```
 v1.2.3
 │ │ │ └── PATCH = 3  → cut -d. -f3
 │ │ └──── MINOR = 2  → cut -d. -f2
-│ └────── MAJOR = 1  → cut -d. -f1 | tr -d 'v' (remove o 'v')
-└──────── Prefixo removido por tr -d
+│ └────── MAJOR = 1  → cut -d. -f1 | tr -d 'v' (removes 'v')
+└──────── Prefix removed by tr -d
 ```
 
-**Incremento:** Sempre incrementa o PATCH (`$((PATCH + 1))`). Para incrementar MINOR ou MAJOR, faça manualmente.
+**Increment:** Always increments the PATCH (`$((PATCH + 1))`). To increment MINOR or MAJOR, do it manually.
 
-### SemVer Explicado
+### SemVer Explained
 
 ```
 v MAJOR . MINOR . PATCH
   │       │       │
-  │       │       └── Correção de bugs (backward compatible)
-  │       └────────── Nova funcionalidade (backward compatible)
-  └────────────────── Breaking change (incompatível)
+  │       │       └── Bug fixes (backward compatible)
+  │       └────────── New feature (backward compatible)
+  └────────────────── Breaking change (incompatible)
 
-Exemplos:
-  v1.2.3 → v1.2.4  (fix: ajuste na route table)
-  v1.2.4 → v1.3.0  (feat: novo módulo de database)
-  v1.3.0 → v2.0.0  (BREAKING: mudança na interface do módulo)
+Examples:
+  v1.2.3 → v1.2.4  (fix: route table adjustment)
+  v1.2.4 → v1.3.0  (feat: new database module)
+  v1.3.0 → v2.0.0  (BREAKING: change in the module interface)
 ```
 
-### Integração com Terraform
+### Terraform Integration
 
-O `infra_version` é usado para rastreabilidade:
+The `infra_version` is used for traceability:
 
 ```bash
 # Via script
-export TF_VAR_infra_version=$(./scripts/version.sh next | grep "Próxima tag" | awk '{print $NF}')
+export TF_VAR_infra_version=$(./scripts/version.sh next | grep "Next tag" | awk '{print $NF}')
 terraform apply
 
-# Via CI/CD (automático)
-# O cd.yml faz isso automaticamente:
+# Via CI/CD (automatic)
+# cd.yml does this automatically:
 env:
   TF_VAR_infra_version: ${{ needs.version.outputs.new_tag }}
 ```
 
-Resultado nos recursos:
+Result in resources:
 ```yaml
-# Namespace do ArgoCD terá:
+# ArgoCD namespace will have:
 metadata:
   labels:
-    infra-version: "v1.2.4"     # ← De onde veio esse namespace?
+    infra-version: "v1.2.4"     # ← Where did this namespace come from?
   annotations:
     infra.tenant.io/version: "v1.2.4"
 ```
 
 ---
 
-##  Conceitos para Estudar
+## 🧠 Concepts to Study
 
-| Conceito | O que é | Relevância |
+| Concept | What it is | Relevance |
 |---------|---------|-----------|
-| **SemVer** | Semantic Versioning (`MAJOR.MINOR.PATCH`) | Padrão de versionamento |
-| **Git Tags** | Marcadores em commits | Releases |
-| **`set -euo pipefail`** | Modo estrito de scripts bash | Robustez |
-| **`terraform fmt`** | Formatação automática de HCL | Padronização |
-| **`terraform validate`** | Validação de sintaxe | Quality gate |
-| **`TF_VAR_*`** | Variáveis de ambiente do Terraform | Injeção de valores |
-| **Anotated tags** | Tags com mensagem (`git tag -a`) | Releases com metadata |
+| **SemVer** | Semantic Versioning (`MAJOR.MINOR.PATCH`) | Versioning standard |
+| **Git Tags** | Markers on commits | Releases |
+| **`set -euo pipefail`** | Bash script strict mode | Robustness |
+| **`terraform fmt`** | HCL automatic formatting | Standardization |
+| **`terraform validate`** | Syntax validation | Quality gate |
+| **`TF_VAR_*`** | Terraform environment variables | Value injection |
+| **Annotated tags** | Tags with message (`git tag -a`) | Releases with metadata |
 
 ---
 
-[← Voltar ao README principal](../../README.md)
+[← Back to main README](../../README.md)

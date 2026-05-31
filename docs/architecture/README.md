@@ -1,104 +1,104 @@
-# ️ Decisões de Arquitetura
+# 🏛️ Architecture Decisions
 
-[← Voltar ao README principal](../../README.md)
+[← Back to main README](../../README.md)
 
 ---
 
-##  Visão Geral
+## 📋 Overview
 
-Este documento explica as **decisões de design** por trás do projeto. Cada decisão inclui: o problema, as alternativas avaliadas, a escolha feita e a justificativa.
+This document explains the **design decisions** behind the project. Each decision includes: the problem, the alternatives evaluated, the choice made, and the justification.
 
 <p align="center">
-  <img src="architecture-diagram.png" alt="Diagrama de Arquitetura" width="800">
+  <img src="architecture-diagram.png" alt="Architecture Diagram" width="800">
 </p>
 
 ---
 
-## 1. Modelo Multi-Tenant: Silo (VPC Dedicada)
+## 1. Multi-Tenant Model: Silo (Dedicated VPC)
 
-### Problema
+### Problem
 
-Como isolar tenants em uma plataforma SaaS na AWS?
+How to isolate tenants in a SaaS platform on AWS?
 
-### Alternativas
+### Alternatives
 
-| Modelo | Descrição | Isolamento | Custo | Complexidade |
+| Model | Description | Isolation | Cost | Complexity |
 |--------|-----------|:----------:|:-----:|:------------:|
-| **Pool** | Todos os tenants na mesma VPC, separados por namespace |  Baixo |  Mínimo |  Médio |
-| **Bridge** | VPC compartilhada com subnets separadas por tenant |  Médio |  Médio |  Médio |
-| **Silo** | VPC dedicada por tenant |  Total |  Alto |  Simples |
+| **Pool** | All tenants in the same VPC, separated by namespace | 🟡 Low | 💚 Minimum | 🟡 Medium |
+| **Bridge** | Shared VPC with subnets separated per tenant | 🟡 Medium | 🟡 Medium | 🟡 Medium |
+| **Silo** | Dedicated VPC per tenant | 🟢 Total | 🔴 High | 🟢 Simple |
 
-### Escolha: **Silo**
+### Choice: **Silo**
 
-### Justificativa
+### Justification
 
-- **Isolamento total de rede**: Nenhum tráfego entre tenants é possível (nem por acidente)
-- **Sem noisy neighbor**: Um tenant não afeta a performance de outro
-- **Auditoria independente**: Flow logs, VPC endpoints e IAM por tenant
-- **Onboarding/Offboarding**: Adicionar ou remover tenant = criar ou destruir módulo
-- **Compliance**: SOC2/HIPAA/PCI-DSS exigem isolamento forte
+- **Total network isolation**: No traffic between tenants is possible (even by accident)
+- **No noisy neighbors**: One tenant does not affect the performance of another
+- **Independent auditing**: Flow logs, VPC endpoints, and IAM per tenant
+- **Onboarding/Offboarding**: Adding or removing a tenant = creating or destroying a module
+- **Compliance**: SOC2/HIPAA/PCI-DSS require strong isolation
 
 ### Trade-offs
 
--  Custo mais alto (cada VPC tem seus NATs, endpoints, etc)
--  Mais recursos para gerenciar
--  Mitigado pela otimização por ambiente (dev sem NAT = $0)
+- ❌ Higher cost (each VPC has its own NATs, endpoints, etc.)
+- ❌ More resources to manage
+- ✅ Mitigated by per-environment optimization (dev without NAT = $0)
 
 ---
 
-## 2. Estrutura de Arquivos: Um Arquivo por Responsabilidade
+## 2. File Structure: One File per Responsibility
 
-### Problema
+### Problem
 
-Como organizar arquivos Terraform sem que o `main.tf` fique com 500+ linhas?
+How to organize Terraform files so that `main.tf` doesn't end up with 500+ lines?
 
-### Alternativas
+### Alternatives
 
-| Abordagem | Descrição |
+| Approach | Description |
 |-----------|-----------|
-| **Monolítico** | Tudo em `main.tf` |
-| **Por recurso** | Um arquivo por tipo de recurso (`vpc.tf`, `subnet.tf`, `igw.tf`) |
-| **Por responsabilidade** | Um arquivo por área de responsabilidade (`routing.tf`, `endpoints.tf`) |
+| **Monolithic** | Everything in `main.tf` |
+| **Per resource** | One file per resource type (`vpc.tf`, `subnet.tf`, `igw.tf`) |
+| **Per responsibility** | One file per area of responsibility (`routing.tf`, `endpoints.tf`) |
 
-### Escolha: **Por Responsabilidade**
+### Choice: **Per Responsibility**
 
-### Resultado
+### Result
 
 ```
 modules/tenant-network/
-├── main.tf           # VPC + IGW (36 linhas)
-├── subnets.tf        # Subnets pub + priv (33 linhas)
-├── nat-gateway.tf    # EIP + NAT (29 linhas)
-├── routing.tf        # Route tables + associações (53 linhas)
-├── endpoints.tf      # VPC Endpoints (105 linhas)
-├── flow-logs.tf      # Flow Logs + IAM (80 linhas)
-├── variables.tf      # 4 variáveis (29 linhas)
-└── outputs.tf        # 8 outputs (33 linhas)
+├── main.tf           # VPC + IGW (36 lines)
+├── subnets.tf        # Pub + priv subnets (33 lines)
+├── nat-gateway.tf    # EIP + NAT (29 lines)
+├── routing.tf        # Route tables + associations (53 lines)
+├── endpoints.tf      # VPC Endpoints (105 lines)
+├── flow-logs.tf      # Flow Logs + IAM (80 lines)
+├── variables.tf      # 4 variables (29 lines)
+└── outputs.tf        # 8 outputs (33 lines)
 ```
 
-### Justificativa
+### Justification
 
-- **Máximo ~105 linhas por arquivo** → Facilita code review
-- **Nome do arquivo = responsabilidade** → Sabe onde procurar
-- **Minimiza conflitos em Git** → Times paralelos editam arquivos diferentes
-- **Facilita onboarding** → Novo dev entende a estrutura imediatamente
+- **Maximum ~105 lines per file** → Facilitates code review
+- **File name = responsibility** → You know where to look
+- **Minimizes Git conflicts** → Parallel teams edit different files
+- **Facilitates onboarding** → A new dev understands the structure immediately
 
 ---
 
-## 3. Variáveis: Contrato Enxuto com `object`
+## 3. Variables: Lean Contract with `object`
 
-### Problema
+### Problem
 
-Quantas variáveis um módulo deve receber? Como evitar "variable explosion"?
+How many variables should a module receive? How to avoid "variable explosion"?
 
-### Alternativas
+### Alternatives
 
-| Abordagem | Variáveis | Exemplo |
+| Approach | Variables | Example |
 |-----------|:---------:|---------|
 | **Flat** | ~15 | `var.cidr`, `var.azs`, `var.public_subnets`, `var.enable_nat`... |
 | **Object** | ~4 | `var.vpc.cidr`, `var.vpc.azs`, `var.vpc.enable_nat_gateway`... |
 
-### Escolha: **Object com Optional**
+### Choice: **Object with Optional**
 
 ```hcl
 variable "vpc" {
@@ -107,29 +107,29 @@ variable "vpc" {
     azs                = list(string)
     public_subnets     = list(string)
     private_subnets    = list(string)
-    enable_nat_gateway = optional(bool, true)    # ← Default inteligente
+    enable_nat_gateway = optional(bool, true)    # ← Smart default
     single_nat_gateway = optional(bool, true)
   })
 }
 ```
 
-### Justificativa
+### Justification
 
-- **4 variáveis no módulo network** (vs 15+ no modelo flat)
-- **Agrupamento semântico** → Todas as configs de VPC ficam juntas
-- **Defaults inteligentes** → `optional(bool, true)` = funciona sem configurar
-- **Tipagem forte** → Erro em tempo de `plan`, não de `apply`
-- **Autocomplete** → IDEs mostram os campos do object
+- **4 variables in the network module** (vs 15+ in the flat model)
+- **Semantic grouping** → All VPC configs are grouped together
+- **Smart defaults** → `optional(bool, true)` = works without configuration
+- **Strong typing** → Error at `plan` time, not `apply`
+- **Autocomplete** → IDEs show the object fields
 
 ---
 
-## 4. NAT Gateway Condicional
+## 4. Conditional NAT Gateway
 
-### Problema
+### Problem
 
-O NAT Gateway custa ~$32/mês fixo + $0.045/GB de tráfego. Em dev, isso é desnecessário.
+A NAT Gateway costs ~$32/month fixed + $0.045/GB of traffic. In dev, this is unnecessary.
 
-### Decisão
+### Decision
 
 ```hcl
 count = var.vpc.enable_nat_gateway ? (
@@ -137,267 +137,267 @@ count = var.vpc.enable_nat_gateway ? (
 ) : 0
 ```
 
-| Ambiente | NAT | Custo estimado |
+| Environment | NAT | Estimated Cost |
 |---------|:---:|:--------------:|
-| Dev |  (0 NATs) | $0/mês |
-| Staging |  (1 NAT) | ~$32/mês |
-| Prod |  (3 NATs) | ~$96/mês |
+| Dev | ❌ (0 NATs) | $0/month |
+| Staging | ✅ (1 NAT) | ~$32/month |
+| Prod | ✅ (3 NATs) | ~$96/month |
 
-### Impacto em Dev
+### Impact in Dev
 
-Sem NAT, recursos em subnets privadas **não acessam a internet**. Consequências:
--  Pods não podem puxar imagens de registries públicos
--  Nodes não podem baixar atualizações
--  VPC Endpoints Gateway (S3, DynamoDB) continuam funcionando
--  Para testes básicos com EKS, funciona
+Without NAT, resources in private subnets **cannot access the internet**. Consequences:
+- ❌ Pods cannot pull images from public registries
+- ❌ Nodes cannot download updates
+- ✅ VPC Gateway Endpoints (S3, DynamoDB) keep working
+- ✅ Works for basic testing with EKS
 
-### Quando habilitar NAT em dev?
+### When to enable NAT in dev?
 
-Se os pods precisarem acessar APIs externas ou puxar imagens do Docker Hub, mude `enable_nat_gateway = true` no `terraform.tfvars`.
+If pods need to access external APIs or pull images from Docker Hub, change `enable_nat_gateway = true` in `terraform.tfvars`.
 
 ---
 
-## 5. VPC Endpoints: Gateway Grátis vs Interface Pago
+## 5. VPC Endpoints: Free Gateway vs Paid Interface
 
-### Problema
+### Problem
 
-VPC Endpoints Interface custam ~$7-20/mês cada. Em dev/staging, não se justifica.
+VPC Interface Endpoints cost ~$7-20/month each. In dev/staging, this is not justified.
 
-### Decisão
+### Decision
 
-| Endpoint | Tipo | Dev | Staging | Prod | Custo |
+| Endpoint | Type | Dev | Staging | Prod | Cost |
 |---------|------|:---:|:-------:|:----:|:-----:|
-| S3 | Gateway |  |  |  | $0 |
-| DynamoDB | Gateway |  |  |  | $0 |
-| ECR API | Interface |  |  |  | ~$7/mês |
-| ECR Docker | Interface |  |  |  | ~$7/mês |
-| CloudWatch Logs | Interface |  |  |  | ~$7/mês |
+| S3 | Gateway | ✅ | ✅ | ✅ | $0 |
+| DynamoDB | Gateway | ✅ | ✅ | ✅ | $0 |
+| ECR API | Interface | ❌ | ❌ | ✅ | ~$7/month |
+| ECR Docker | Interface | ❌ | ❌ | ✅ | ~$7/month |
+| CloudWatch Logs | Interface | ❌ | ❌ | ✅ | ~$7/month |
 
-### Justificativa
+### Justification
 
-- **Gateway Endpoints são GRÁTIS** → Sempre habilitados
-- **Interface Endpoints são pagos** → Só em prod onde segurança e performance são críticas
-- Em prod, ECR endpoints evitam que pull de imagens passe pelo NAT (economia de $0.045/GB)
-- Em prod, Logs endpoint garante que logs cheguem mesmo sem internet
+- **Gateway Endpoints are FREE** → Always enabled
+- **Interface Endpoints are paid** → Only in prod where security and performance are critical
+- In prod, ECR endpoints prevent image pulls from going through the NAT (saving $0.045/GB)
+- In prod, Logs endpoint ensures logs ensures logs arrive even without internet access
 
 ---
 
 ## 6. Karpenter vs Cluster Autoscaler
 
-### Problema
+### Problem
 
-Como escalar nodes automaticamente no EKS?
+How to scale nodes automatically in EKS?
 
-### Alternativas
+### Alternatives
 
-| Ferramenta | Abordagem | Speed | Custo |
+| Tool | Approach | Speed | Cost |
 |-----------|-----------|:-----:|:-----:|
-| **Cluster Autoscaler** | Reage a pods pending, adiciona nodes do ASG |  ~2-5 min |  |
-| **Karpenter** | Avalia workloads, provisiona instâncias otimizadas |  ~30s-1 min |  |
+| **Cluster Autoscaler** | Reacts to pending pods, adds ASG nodes | 🟡 ~2-5 min | 🟡 |
+| **Karpenter** | Evaluates workloads, provisions optimized instances | 🟢 ~30s-1 min | 🟢 |
 
-### Escolha: **Karpenter**
+### Choice: **Karpenter**
 
-### Justificativa
+### Justification
 
-- **30s vs 3min** → Karpenter provisiona nodes 3-5x mais rápido
-- **Spot + On-Demand** → Mix automático para otimizar custo
-- **Consolidation** → Remove nós subutilizados automaticamente
-- **Instance diversity** → Escolhe entre 6 famílias de instância
-- **CPU Limit** → Controla gasto máximo (2 vCPU em dev, 100 em prod)
-- **Reciclagem** → Nodes são trocados a cada 30 dias (segurança)
+- **30s vs 3min** → Karpenter provisions nodes 3-5x faster
+- **Spot + On-Demand** → Automatic mix to optimize cost
+- **Consolidation** → Automatically removes underutilized nodes
+- **Instance diversity** → Chooses from 6 instance families
+- **CPU Limit** → Controls maximum spend (2 vCPU in dev, 100 in prod)
+- **Recycling** → Nodes are rotated every 30 days (security)
 
 ### Backup
 
-O ApplicationSet do ArgoCD também instala o `cluster-autoscaler` como fallback, caso o Karpenter falhe.
+The ArgoCD ApplicationSet also installs `cluster-autoscaler` as a fallback in case Karpenter fails.
 
 ---
 
 ## 7. ArgoCD ApplicationSets: Git vs List Generator
 
-### Problema
+### Problem
 
-Como gerenciar deploy de aplicações de tenants e infraestrutura?
+How to manage application deployments for tenants and infrastructure?
 
-### Decisão
+### Decision
 
-| ApplicationSet | Generator | Propósito |
+| ApplicationSet | Generator | Purpose |
 |---------------|-----------|-----------|
-| `tenant-apps` | **Git** (directories) | Detecta pastas em `tenants/*` |
-| `infra-apps` | **List** (static) | Componentes de infra com versões fixas |
+| `tenant-apps` | **Git** (directories) | Detects folders under `tenants/*` |
+| `infra-apps` | **List** (static) | Infrastructure components with fixed versions |
 
-### Por que Git Generator para tenants?
+### Why Git Generator for tenants?
 
 ```
-# Onboarding de novo tenant:
-# 1. Cria pasta tenants/novo-tenant/ no repo
-# 2. Adiciona manifests K8s
-# 3. Push → ArgoCD detecta automaticamente
-# 4. Application criado → Deploy automático
+# Onboarding a new tenant:
+# 1. Create tenants/new-tenant/ folder in the repo
+# 2. Add K8s manifests
+# 3. Push → ArgoCD automatically detects
+# 4. Application created → Automatic deploy
 ```
 
-**Zero configuração manual** para novos tenants!
+**Zero manual configuration** for new tenants!
 
-### Por que List Generator para infra?
+### Why List Generator for infra?
 
-Componentes de infra precisam de **versões controladas** (não podem ser "latest"):
+Infrastructure components need **controlled versions** (cannot be "latest"):
 
 ```yaml
 - name: ingress-nginx
-  version: 4.12.0    # ← Versão fixa, controlada
+  version: 4.12.0    # ← Fixed, controlled version
 - name: cert-manager
   version: 1.17.0
 ```
 
-Atualizar versão = editar a lista → PR → Review → Merge → Deploy.
+Updating version = edit the list → PR → Review → Merge → Deploy.
 
 ---
 
-## 8. AppProjects: Zero-Trust entre Tenants e Infra
+## 8. AppProjects: Zero-Trust between Tenants and Infra
 
-### Problema
+### Problem
 
-Como evitar que um tenant acesse ou modifique recursos de outro?
+How to prevent one tenant from accessing or modifying another's resources?
 
-### Decisão
+### Decision
 
 ```
 ┌─── AppProject: infra ──────────────────┐
-│  Repos: Helm charts oficiais          │
-│  Namespaces: ingress, cert-mgr, etc. │
-│  Cluster resources: todos             │
-│  Acesso a repos de tenants            │
+│ ✅ Repos: Official Helm charts         │
+│ ✅ Namespaces: ingress, cert-mgr, etc. │
+│ ✅ Cluster resources: all              │
+│ ❌ Access to tenant repos              │
 └─────────────────────────────────────────┘
 
 ┌─── AppProject: tenants ────────────────┐
-│  Repo: github.com/${tenant}           │
-│  Namespaces: * (qualquer)             │
-│  Cluster resources: Namespace, Quota  │
-│  CRDs, ClusterRoles, etc.             │
+│ ✅ Repo: github.com/${tenant}           │
+│ ✅ Namespaces: * (any)                 │
+│ ✅ Cluster resources: Namespace, Quota  │
+│ ❌ CRDs, ClusterRoles, etc.             │
 └─────────────────────────────────────────┘
 ```
 
-### Justificativa
+### Justification
 
-- **Mínimo privilégio** → Tenants não podem criar CRDs ou ClusterRoles
-- **Isolamento de repos** → Cada projeto só acessa seus repos autorizados
-- **ResourceQuota/LimitRange** → Tenants podem limitar seus próprios namespaces
-- **Orphaned resources** → ArgoCD avisa sobre recursos órfãos
+- **Least privilege** → Tenants cannot create CRDs or ClusterRoles
+- **Repo isolation** → Each project only accesses its authorized repos
+- **ResourceQuota/LimitRange** → Tenants can limit their own namespaces
+- **Orphaned resources** → ArgoCD warns about orphaned resources
 
 ---
 
-## 9. IAM: Mínimo Privilégio com 3 Roles
+## 9. IAM: Least Privilege with 3 Roles
 
-### Problema
+### Problem
 
-Quantas IAM Roles o EKS precisa e com quais permissões?
+How many IAM Roles does EKS need and with which permissions?
 
-### Decisão
+### Decision
 
-| Role | Quem assume | Permissões |
+| Role | Assumed by | Permissions |
 |------|-----------|-----------|
 | **Cluster** | `eks.amazonaws.com` | `EKSClusterPolicy` + `VPCResourceController` |
 | **Node** | `ec2.amazonaws.com` | `WorkerNode` + `CNI` + `ECR` + `SSM` |
-| **Karpenter** | `ec2.amazonaws.com` | Node policies + Custom EC2 (condicional) |
+| **Karpenter** | `ec2.amazonaws.com` | Node policies + Custom EC2 (conditional) |
 
-### Por que SSM em vez de SSH?
+### Why SSM instead of SSH?
 
 | SSH | SSM |
 |:---:|:---:|
-| Precisa abrir porta 22 | Nenhuma porta aberta |
-| Gerenciar chaves `.pem` | Sem chaves |
-| Security Group permissivo | Sem SG adicional |
-| Sem auditoria nativa | CloudTrail nativo |
+| Needs to open port 22 | No open ports |
+| Manage `.pem` keys | Keyless |
+| Permissive Security Group | No additional SG |
+| No native auditing | Native CloudTrail |
 
 ---
 
-## 10. Wait-for-Cluster: "Gambi Necessária"
+## 10. Wait-for-Cluster: "Necessary Workaround"
 
-### Problema
+### Problem
 
-O Terraform cria o cluster EKS e **imediatamente** tenta aplicar manifests (Karpenter, ArgoCD). Mas o cluster ainda não está operacional (~15 min).
+Terraform creates the EKS cluster and **immediately** tries to apply manifests (Karpenter, ArgoCD). But the cluster is not yet operational (~15 min).
 
-### Alternativas
+### Alternatives
 
-| Abordagem | Prós | Contras |
+| Approach | Pros | Cons |
 |-----------|------|---------|
-| **Separar em 2 applies** | Simples | Manual, propenso a erro |
-| **`depends_on` apenas** | Nativo | Não espera cluster ficar ACTIVE |
-| **`null_resource` com wait** | Espera de verdade | "Gambi" (provisioner local-exec) |
+| **Separate into 2 applies** | Simple | Manual, error-prone |
+| **`depends_on` only** | Native | Does not wait for cluster to become ACTIVE |
+| **`null_resource` with wait** | Real wait | "Workaround" (local-exec provisioner) |
 
-### Escolha: **null_resource com local-exec**
+### Choice: **null_resource with local-exec**
 
 ```hcl
 resource "null_resource" "wait_for_cluster" {
   provisioner "local-exec" {
     command = <<EOF
       aws eks wait cluster-active --name ${cluster}
-      # Polling de nodes: até 5 minutos
+      # Node polling: up to 5 minutes
     EOF
   }
 }
 ```
 
-### Justificativa
+### Justification
 
-- Sem esse wait, o `terraform apply` **sempre falha** na primeira vez
-- O `depends_on` nativo não sabe esperar status ACTIVE
-- É uma "gambi documentada" — o comentário no código explica exatamente por que existe
-- Alternativa nativa (Terraform wait condition) não existe para EKS
+- Without this wait, `terraform apply` **always fails** the first time
+- Native `depends_on` does not know how to wait for ACTIVE status
+- It is a "documented workaround" — the comment in the code explains exactly why it exists
+- A native alternative (Terraform wait condition) does not exist for EKS
 
 ---
 
-## 11. Versionamento: SemVer Automático no CI/CD
+## 11. Versioning: Automatic SemVer in CI/CD
 
-### Problema
+### Problem
 
-Como rastrear qual versão da infraestrutura criou cada recurso?
+How to track which version of the infrastructure created each resource?
 
-### Decisão
+### Decision
 
 ```
-Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations nos recursos
+Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations on resources
 ```
 
-| Etapa | O que acontece |
+| Step | What happens |
 |-------|---------------|
-| Merge para main | CD calcula próxima versão (patch increment) |
-| Git tag | `v1.2.4` criada e enviada |
+| Merge to main | CD calculates next version (patch increment) |
+| Git tag | `v1.2.4` created and pushed |
 | terraform apply | `TF_VAR_infra_version=v1.2.4` |
-| Namespace ArgoCD | Label: `infra-version: v1.2.4` |
+| ArgoCD Namespace | Label: `infra-version: v1.2.4` |
 
-### Benefícios
+### Benefits
 
-- **Rastreabilidade**: "Qual versão criou este namespace?" → `kubectl get ns argocd -o yaml`
-- **Rollback**: Se a v1.2.4 quebrou, volte para v1.2.3
-- **Auditoria**: Tags no Git funcionam como release notes
+- **Traceability**: "Which version created this namespace?" → `kubectl get ns argocd -o yaml`
+- **Rollback**: If v1.2.4 broke, roll back to v1.2.3
+- **Audit**: Git tags work as release notes
 
 ---
 
-## 12. FinOps: Custo como Variável de Arquitetura
+## 12. FinOps: Cost as an Architecture Variable
 
-### Filosofia
+### Philosophy
 
-> "Custo não é otimização posterior. É decisão de arquitetura."
+> "Cost is not a later optimization. It is an architecture decision."
 
-### Decisões de FinOps
+### FinOps Decisions
 
-| Decisão | Economia | Onde |
+| Decision | Savings | Where |
 |---------|:--------:|------|
-| NAT condicional | $0-96/mês | `nat-gateway.tf` |
-| Gateway endpoints (grátis) | $0 | `endpoints.tf` |
-| Interface endpoints só em prod | ~$21/mês | `endpoints.tf` |
-| Flow logs só em prod | ~$5/mês | `flow-logs.tf` |
+| Conditional NAT | $0-96/month | `nat-gateway.tf` |
+| Gateway endpoints (free) | $0 | `endpoints.tf` |
+| Interface endpoints only in prod | ~$21/month | `endpoints.tf` |
+| Flow logs only in prod | ~$5/month | `flow-logs.tf` |
 | Karpenter Spot instances | 60-90% | `karpenter.tf` |
-| Karpenter consolidation | Variável | `karpenter.tf` |
-| CPU limit em dev (2 vCPU) | Ilimitado | `karpenter.tf` |
-| CloudWatch 7d em dev | Variável | `main.tf` EKS |
-| EKS logs mínimos em dev | ~$5/mês | `main.tf` EKS |
-| Tags de CostCenter | Visibilidade | Todos recursos |
-| Infracost preview em PRs | Prevenção | `ci.yml` |
+| Karpenter consolidation | Variable | `karpenter.tf` |
+| CPU limit in dev (2 vCPU) | Unlimited | `karpenter.tf` |
+| CloudWatch 7d in dev | Variable | EKS `main.tf` |
+| Minimal EKS logs in dev | ~$5/month | EKS `main.tf` |
+| CostCenter tags | Visibility | All resources |
+| Infracost preview in PRs | Prevention | `ci.yml` |
 
-### Custo Estimado por Ambiente
+### Estimated Cost per Environment
 
-| Componente | Dev | Staging | Prod |
+| Component | Dev | Staging | Prod |
 |-----------|:---:|:-------:|:----:|
 | VPC/Subnets | $0 | $0 | $0 |
 | NAT Gateway | $0 | ~$32 | ~$96 |
@@ -409,70 +409,70 @@ Git tag (SemVer) → TF_VAR_infra_version → Labels/Annotations nos recursos
 | CloudWatch Logs | ~$2 | ~$2 | ~$10 |
 | **TOTAL** | **~$216** | **~$248** | **~$346** |
 
-> **Nota:** Dev pode ser destruído quando não está em uso → $0.
-> Staging sem EKS = ~$32/mês. Prod sem EKS = ~$122/mês.
+> **Note:** Dev can be destroyed when not in use → $0.
+> Staging without EKS = ~$32/month. Prod without EKS = ~$122/month.
 
 ---
 
-##  Resumo: Como um DevOps Sênior Pensa
+## 🧠 Summary: How a Senior DevOps Thinks
 
 ```
-1. PENSE    → Desenhe a arquitetura no papel
-2. DEFINA   → Variáveis primeiro (o contrato)
-3. CONSTRUA → Mínimo viável, iterativamente
-4. VALIDE   → terraform plan a cada passo
-5. DOCUMENTE → Enquanto constrói, não depois
-6. OTIMIZE  → Custo só quando a estrutura básica funciona
+1. THINK     → Draw the architecture on paper
+2. DEFINE    → Variables first (the contract)
+3. BUILD     → Minimum viable, iteratively
+4. VALIDATE  → terraform plan at every step
+5. DOCUMENT  → While building, not after
+6. OPTIMIZE  → Cost only when the basic structure works
 ```
 
-> *"Um DevOps Sênior não é quem sabe tudo de cabeça.
-> É quem sabe as perguntas certas a fazer e como validar
-> cada passo antes de prosseguir."*
+> *"A Senior DevOps is not someone who knows everything off the top of their head.
+> It's someone who knows the right questions to ask and how to validate
+> each step before moving forward."*
 
 ---
 
-##  Guia Visual: Desenhando no Papel (4 Passos)
+## 🎨 Visual Guide: Drawing on Paper (4 Steps)
 
-Se fosse desenhar esta arquitetura no papel/quadro branco, o raciocínio seria este:
+If you were to draw this architecture on paper/whiteboard, this would be the reasoning:
 
-### Passo 1 — O Problema: Como Isolar os Tenants?
+### Step 1 — The Problem: How to Isolate Tenants?
 
 <p align="center">
-  <img src="whiteboard-step1-problema.png" alt="Passo 1: O Problema" width="700">
+  <img src="whiteboard-step1-problema.png" alt="Step 1: The Problem" width="700">
 </p>
 
-> Antes de escrever qualquer código, defina o **modelo de isolamento**. Pool, Bridge ou Silo? Avalie os trade-offs de custo vs segurança. Neste projeto: **Silo** (VPC dedicada por tenant).
+> Before writing any code, define the **isolation model**. Pool, Bridge, or Silo? Evaluate the cost vs security trade-offs. In this project: **Silo** (dedicated VPC per tenant).
 
 ---
 
-### Passo 2 — Rede: Desenhando a VPC
+### Step 2 — Network: Drawing the VPC
 
 <p align="center">
-  <img src="whiteboard-step2-rede.png" alt="Passo 2: Rede" width="700">
+  <img src="whiteboard-step2-rede.png" alt="Step 2: Network" width="700">
 </p>
 
-> Desenhe a VPC com subnets públicas e privadas. Decida: NAT sim ou não? Endpoints grátis ou pagos? **Comece SEMPRE pelas variáveis** — o contrato do módulo. 4 variáveis = contrato enxuto.
+> Draw the VPC with public and private subnets. Decide: NAT yes or no? Free or paid endpoints? **ALWAYS start with the variables** — the module's contract. 4 variables = lean contract.
 
 ---
 
-### Passo 3 — Compute + GitOps: EKS + Karpenter + ArgoCD
+### Step 3 — Compute + GitOps: EKS + Karpenter + ArgoCD
 
 <p align="center">
-  <img src="whiteboard-step3-compute.png" alt="Passo 3: Compute" width="700">
+  <img src="whiteboard-step3-compute.png" alt="Step 3: Compute" width="700">
 </p>
 
-> Pense em camadas: VPC (base) → EKS (meio) → ArgoCD (topo). Node Group On-Demand para workloads críticas, Karpenter Spot para o resto. ApplicationSets: **nova pasta no Git = novo tenant automático**.
+> Think in layers: VPC (base) → EKS (middle) → ArgoCD (top). On-Demand Node Group for critical workloads, Karpenter Spot for the rest. ApplicationSets: **new folder in Git = automatic new tenant**.
 
 ---
 
-### Passo 4 — CI/CD + Segurança + Custos
+### Step 4 — CI/CD + Security + Costs
 
 <p align="center">
-  <img src="whiteboard-step4-cicd.png" alt="Passo 4: CI/CD" width="700">
+  <img src="whiteboard-step4-cicd.png" alt="Step 4: CI/CD" width="700">
 </p>
 
-> Três pilares finais: **Pipeline** (CI em PRs, CD no merge), **Segurança em Camadas** (SAST + DAST + IAM + KMS), **FinOps** (NAT condicional, Spot, CPU limits). Dev pode ser $0 quando destruído.
+> Three final pillars: **Pipeline** (CI on PRs, CD on merge), **Layered Security** (SAST + DAST + IAM + KMS), **FinOps** (conditional NAT, Spot, CPU limits). Dev can be $0 when destroyed.
 
 ---
 
-[← Voltar ao README principal](../../README.md)
+[← Back to main README](../../README.md)

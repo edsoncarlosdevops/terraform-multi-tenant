@@ -1,64 +1,64 @@
-# 🌍 Environments — Dev, Staging, and Prod
+#  Environments — Dev, Staging e Prod
 
-[← Back to main README](../../README.md)
+[← Voltar ao README principal](../../README.pt-br.md)
 
 ---
 
-## 📋 Overview
+##  Visão Geral
 
-Environments are the **concrete instantiations** of modules. Each environment calls the reusable modules (`tenant-network`, `tenant-eks`, `tenant-argocd`) with specific parameters for the environment.
+Os environments são as **instanciações concretas** dos módulos. Cada environment chama os módulos reutilizáveis (`tenant-network`, `tenant-eks`, `tenant-argocd`) com parâmetros específicos para o ambiente.
 
 ```
 environments/
-├── dev/            ← Minimum cost, fast development
-├── staging/        ← Balanced, validation before prod
-└── prod/           ← High availability, maximum security
+├── dev/            ← Custo mínimo, desenvolvimento rápido
+├── staging/        ← Balanceado, validação antes de prod
+└── prod/           ← Alta disponibilidade, segurança máxima
 ```
 
 ---
 
-## 📐 Complete Comparison
+##  Comparativo Completo
 
-| Feature | Dev | Staging | Prod |
+| Característica | Dev | Staging | Prod |
 |:--------------|:---:|:-------:|:----:|
 | **Tenant** | `acme-corp` | `acme-corp` | `acme-corp` |
 | **CIDR** | `10.10.0.0/16` | `10.20.0.0/16` | `10.30.0.0/16` |
 | **AZs** | 2 (`1a`, `1b`) | 3 (`1a`, `1b`, `1c`) | 3 (`1a`, `1b`, `1c`) |
-| **Public Subnets** | 2 | 3 | 3 |
-| **Private Subnets** | 2 | 3 | 3 |
-| **NAT Gateway** | ❌ Disabled | ✅ 1 (single) | ✅ 3 (1 per AZ) |
-| **VPC Endpoints Gateway** | ✅ S3 + DynamoDB | ✅ S3 + DynamoDB | ✅ S3 + DynamoDB |
-| **VPC Endpoints Interface** | ❌ | ❌ | ✅ ECR + Logs |
-| **Flow Logs** | ❌ | ❌ | ✅ (90 days) |
-| **EKS Cluster** | ✅ | ❌ (network only) | ❌ (network only) |
-| **Karpenter** | ✅ (CPU limit: 2) | — | — |
-| **ArgoCD** | ✅ | — | — |
+| **Subnets Públicas** | 2 | 3 | 3 |
+| **Subnets Privadas** | 2 | 3 | 3 |
+| **NAT Gateway** |  Desabilitado |  1 (single) |  3 (1 por AZ) |
+| **VPC Endpoints Gateway** |  S3 + DynamoDB |  S3 + DynamoDB |  S3 + DynamoDB |
+| **VPC Endpoints Interface** |  |  |  ECR + Logs |
+| **Flow Logs** |  |  |  (90 dias) |
+| **EKS Cluster** |  |  (apenas network) |  (apenas network) |
+| **Karpenter** |  (CPU limit: 2) | — | — |
+| **ArgoCD** |  | — | — |
 | **Backend S3 key** | `environments/dev/` | `environments/staging/` | `environments/prod/` |
-| **CD Deploy** | Automatic | Manual approval | Approval + freeze |
-| **Estimated cost** | ~$75/month | ~$40/month (network only) | ~$140/month (network only) |
+| **CD Deploy** | Automático | Approval manual | Approval + freeze |
+| **Custo estimado** | ~$75/mês | ~$40/mês (só rede) | ~$140/mês (só rede) |
 
-> **Note:** Staging and Prod currently only create the `tenant-network` module. The EKS and ArgoCD modules can be added following the dev pattern.
+> **Nota:** Staging e Prod atualmente só criam o módulo `tenant-network`. Os módulos EKS e ArgoCD podem ser adicionados seguindo o padrão do dev.
 
 ---
 
-## 🟢 Environment: Dev
+##  Ambiente: Dev
 
-### Philosophy
-> "Minimum cost, fast iteration. No NAT = $0 in network."
+### Filosofia
+> "Custo mínimo, iteração rápida. Sem NAT = $0 em rede."
 
-### Files
+### Arquivos
 
 #### `environments/dev/main.tf`
 
-Dev's `main.tf` is the most complete — it orchestrates the 3 modules:
+O `main.tf` do dev é o mais completo — orquestra os 3 módulos:
 
 ```hcl
 # ═══════════════════════════════════════════════════
-# RECOMMENDED EXECUTION ORDER:
+# ORDEM DE EXECUÇÃO RECOMENDADA:
 #   Apply #1: terraform apply -target=module.tenant_network \
 #                              -target=module.tenant_eks
-#   ⏳ Wait ~15 min for the EKS cluster to become ACTIVE
-#   Apply #2: terraform apply (installs Karpenter + ArgoCD)
+#   ⏳ Aguarda ~15 min o cluster EKS ficar ACTIVE
+#   Apply #2: terraform apply (instala Karpenter + ArgoCD)
 # ═══════════════════════════════════════════════════
 
 terraform {
@@ -71,7 +71,7 @@ terraform {
   }
 }
 
-# kubectl Provider — ONLY works AFTER the EKS cluster is active
+# Provider kubectl — SÓ funciona DEPOIS do cluster EKS ativo
 provider "kubectl" {
   host                   = module.tenant_eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.tenant_eks.cluster_certificate_authority_data)
@@ -79,18 +79,18 @@ provider "kubectl" {
   load_config_file       = false
 }
 
-# Dependency chain:
+# Cadeia de dependências:
 # tenant_network → tenant_eks → tenant_argocd
 module "tenant_network" { ... }
-module "tenant_eks"     { ... }     # Depends on network
-module "tenant_argocd"  { ... }     # Depends on EKS
+module "tenant_eks"     { ... }     # Depende de network
+module "tenant_argocd"  { ... }     # Depende de EKS
 ```
 
-**Key points:**
-1. **5 providers**: `aws`, `helm`, `kubernetes`, `kubectl` — all required for EKS + ArgoCD
-2. **S3 Backend**: Unique key `environments/dev/terraform.tfstate`
-3. **Circular kubectl provider**: Configured with EKS module outputs (which do not exist yet in the first apply)
-4. **Explicit order**: Inline documentation explains when to use `-target`
+**Pontos-chave:**
+1. **5 providers**: `aws`, `helm`, `kubernetes`, `kubectl` — todos necessários para EKS + ArgoCD
+2. **Backend S3**: Key única `environments/dev/terraform.tfstate`
+3. **Provider kubectl circular**: Configurado com outputs do módulo EKS (que ainda não existe no primeiro apply)
+4. **Ordem explícita**: A documentação inline explica quando usar `-target`
 
 #### `environments/dev/terraform.tfvars`
 
@@ -103,7 +103,7 @@ vpc = {
   azs                = ["us-east-1a", "us-east-1b"]
   public_subnets     = ["10.10.1.0/24", "10.10.2.0/24"]
   private_subnets    = ["10.10.10.0/24", "10.10.11.0/24"]
-  enable_nat_gateway = false    # ← NO NAT: zero network cost
+  enable_nat_gateway = false    # ← SEM NAT: custo zero de rede
   single_nat_gateway = true
 }
 
@@ -117,7 +117,7 @@ tags = {
 
 #### `environments/dev/variables.tf`
 
-7 variables: `tenant`, `environment`, `vpc`, `tags`, `infra_version`, `enable_karpenter`, `argocd_domain`
+7 variáveis: `tenant`, `environment`, `vpc`, `tags`, `infra_version`, `enable_karpenter`, `argocd_domain`
 
 #### `environments/dev/outputs.tf`
 
@@ -125,16 +125,16 @@ tags = {
 
 ---
 
-## 🟡 Environment: Staging
+##  Ambiente: Staging
 
-### Philosophy
-> "Balanced: 1 NAT for internet access from private subnets. Validation before prod."
+### Filosofia
+> "Balanceado: 1 NAT para acesso internet das subnets privadas. Validação antes de prod."
 
-### Files
+### Arquivos
 
 #### `environments/staging/main.tf`
 
-Currently **only the network module**:
+Atualmente **apenas o módulo network**:
 
 ```hcl
 terraform {
@@ -164,7 +164,7 @@ vpc = {
   public_subnets     = ["10.20.1.0/24", "10.20.2.0/24", "10.20.3.0/24"]
   private_subnets    = ["10.20.10.0/24", "10.20.11.0/24", "10.20.12.0/24"]
   enable_nat_gateway = true
-  single_nat_gateway = true     # ← Only 1 NAT (savings)
+  single_nat_gateway = true     # ← Apenas 1 NAT (economia)
 }
 
 tags = {
@@ -177,16 +177,16 @@ tags = {
 
 ---
 
-## 🔴 Environment: Prod
+##  Ambiente: Prod
 
-### Philosophy
-> "Full high availability. NAT per AZ, flow logs, Interface endpoints. No compromises."
+### Filosofia
+> "Alta disponibilidade total. NAT por AZ, flow logs, endpoints Interface. Sem compromissos."
 
-### Files
+### Arquivos
 
 #### `environments/prod/main.tf`
 
-Currently **only the network module** (same pattern as staging):
+Atualmente **apenas o módulo network** (mesmo padrão do staging):
 
 ```hcl
 terraform {
@@ -216,13 +216,13 @@ vpc = {
   public_subnets     = ["10.30.1.0/24", "10.30.2.0/24", "10.30.3.0/24"]
   private_subnets    = ["10.30.10.0/24", "10.30.11.0/24", "10.30.12.0/24"]
   enable_nat_gateway = true
-  single_nat_gateway = false    # ← NAT per AZ for HA
+  single_nat_gateway = false    # ← NAT por AZ para HA
 }
 ```
 
-#### Extra Output: `vpc_flow_log_group`
+#### Output Extra: `vpc_flow_log_group`
 
-The prod `outputs.tf` exposes `vpc_flow_log_group` (which does not exist in other environments):
+O `outputs.tf` de prod expõe o `vpc_flow_log_group` (que não existe nos outros ambientes):
 
 ```hcl
 output "vpc_flow_log_group" {
@@ -232,10 +232,10 @@ output "vpc_flow_log_group" {
 
 ---
 
-## 📐 CIDR Map
+##  Mapa de CIDRs
 
 ```
-                    10.0.0.0/8 (Private space)
+                    10.0.0.0/8 (Espaço privado)
                          │
     ┌────────────────────┼────────────────────┐
     │                    │                    │
@@ -255,28 +255,28 @@ output "vpc_flow_log_group" {
 └───────┘          └───────────┘        └───────────┘
 ```
 
-**Why separate CIDRs?**
-- Allows **VPC Peering** between environments if needed
-- No IP overlap
-- Makes visual identification easier: `10.10.x = dev`, `10.20.x = staging`, `10.30.x = prod`
+**Por que CIDRs separados?**
+- Permite **VPC Peering** entre ambientes se necessário
+- Sem overlap de IPs
+- Facilita identificação visual: `10.10.x = dev`, `10.20.x = staging`, `10.30.x = prod`
 
 ---
 
-## 🚀 How to Expand Staging/Prod
+##  Como Expandir Staging/Prod
 
-To add EKS + ArgoCD in staging/prod, follow the dev pattern:
+Para adicionar EKS + ArgoCD em staging/prod, siga o padrão do dev:
 
 ```hcl
-# environments/staging/main.tf — add:
+# environments/staging/main.tf — adicione:
 
-# 1. Additional providers
+# 1. Providers adicionais
 required_providers {
   helm       = { source = "hashicorp/helm", version = "~> 2.17" }
   kubernetes = { source = "hashicorp/kubernetes", version = "~> 2.35" }
   kubectl    = { source = "gavinbunney/kubectl", version = "~> 1.14" }
 }
 
-# 2. kubectl provider
+# 2. Provider kubectl
 provider "kubectl" {
   host                   = module.tenant_eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.tenant_eks.cluster_certificate_authority_data)
@@ -287,7 +287,7 @@ data "aws_eks_cluster_auth" "this" {
   name = module.tenant_eks.cluster_name
 }
 
-# 3. EKS and ArgoCD modules
+# 3. Módulos EKS e ArgoCD
 module "tenant_eks" {
   source             = "../../modules/tenant-eks"
   tenant             = var.tenant
@@ -310,18 +310,18 @@ module "tenant_argocd" {
 
 ---
 
-## 🧠 Concepts to Study
+##  Conceitos para Estudar
 
-| Concept | What it is | Relevance |
+| Conceito | O que é | Relevância |
 |---------|---------|-----------|
-| **terraform.tfvars** | Default variable values file | Per-environment configuration |
-| **S3 Backend** | Remote state storage | State management |
-| **`-target`** | Apply only specific resources | Phased deployment |
-| **Provider configuration** | Configure providers with module outputs | Circular dependency |
-| **`depends_on` in modules** | Force execution order between modules | Orchestration |
-| **VPC Peering** | Connect VPCs of different environments | Cross-environment communication |
-| **GitHub Environments** | Protection rules for deployments | Approval gates |
+| **terraform.tfvars** | Arquivo de valores padrão para variáveis | Configuração por ambiente |
+| **Backend S3** | Armazenamento remoto do state | State management |
+| **`-target`** | Aplicar apenas recursos específicos | Deploy em fases |
+| **Provider configuration** | Configurar providers com outputs de módulos | Dependência circular |
+| **`depends_on` em módulos** | Forçar ordem de execução entre módulos | Orquestração |
+| **VPC Peering** | Conectar VPCs de ambientes diferentes | Comunicação cross-env |
+| **Environments no GitHub** | Protection rules para deploys | Approval gates |
 
 ---
 
-[← Back to main README](../../README.md)
+[← Voltar ao README principal](../../README.pt-br.md)
