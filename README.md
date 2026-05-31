@@ -234,15 +234,33 @@ terraform apply -auto-approve
 
 ### Passo 2 — Deploy do Ambiente Dev
 
+Você pode fazer o deploy do ambiente de desenvolvimento de forma manual ou automatizada:
+
+#### Opção A: Deploy Automatizado (Recomendado para uso local)
+Para executar o deploy e configurar automaticamente o seu arquivo de conexão `kubeconfig` local:
+
 ```bash
-cd environments/dev
-terraform init
-terraform apply -auto-approve
+./scripts/deploy.sh
 ```
 
-> ⚠️ **Tempo estimado:** ~15 minutos (o EKS demora para ficar ACTIVE)
+#### Opção B: Deploy Manual
+1. Navegue para o diretório do ambiente:
+   ```bash
+   cd environments/dev
+   ```
+2. Inicialize o Terraform e aplique as configurações:
+   ```bash
+   terraform init
+   terraform apply -auto-approve
+   ```
+3. Após a conclusão, atualize o seu `kubeconfig` local para obter acesso ao cluster:
+   ```bash
+   aws eks update-kubeconfig --region us-east-1 --name acme-corp-dev-eks
+   ```
+
+> ⚠️ **Tempo estimado:** ~20 a 30 minutos (o provisionamento do control plane do EKS, subida dos nós e ArgoCD levam tempo).
 >
-> **Dica:** Em caso de erro na primeira vez, aguarde 2-3 min e rode `terraform apply` novamente.
+> **Dica:** Em caso de erro na primeira aplicação (comum devido a delays de propagação IAM na criação das roles do Kubernetes), aguarde 2 minutos e execute novamente.
 
 ### Passo 3 — Deploy de Staging/Prod
 
