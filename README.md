@@ -68,11 +68,11 @@ This project implements a **complete SaaS multi-tenant infrastructure on AWS** u
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              GITHUB ACTIONS                                │
-│  ┌──────────┐  ┌───────────┐  ┌───────────┐  ┌──────────┐  ┌───────────┐  │
-│  │ CI: Plan │  │ CD: Apply │  │  Security │  │ Infracost│  │ Tag/SemVer│  │
-│  └────┬─────┘  └─────┬─────┘  └─────┬─────┘  └────┬─────┘  └─────┬─────┘  │
-└───────┼──────────────┼──────────────┼──────────────┼──────────────┼────────┘
+│                              GITHUB ACTIONS                                 │
+│  ┌──────────┐  ┌───────────┐  ┌───────────┐  ┌──────────┐  ┌───────────┐    │
+│  │ CI: Plan │  │ CD: Apply │  │  Security │  │ Infracost│  │ Tag/SemVer│    │
+│  └────┬─────┘  └─────┬─────┘  └─────┬─────┘  └────┬─────┘  └─────┬─────┘    │
+└───────┼──────────────┼──────────────┼──────────────┼──────────────┼────────-┘
         │              │              │              │              │
         └──────────────┴──────────────┴──────────────┴──────────────┘
                                       │
@@ -83,21 +83,21 @@ This project implements a **complete SaaS multi-tenant infrastructure on AWS** u
                                       │
         ┌─────────────────────────────┼─────────────────────────────┐
         │                             │                             │
-   ┌────┴────┐                  ┌─────┴────┐                 ┌─────┴────┐
-   │   DEV   │                  │ STAGING  │                 │   PROD   │
-   │ 10.10.x │                  │ 10.20.x  │                 │ 10.30.x  │
-   │  2 AZs  │                  │  3 AZs   │                 │  3 AZs   │
-   │ NAT: 1  │                  │ NAT: 1   │                 │ NAT: 3   │
-   └────┬────┘                  └────┬─────┘                 └────┬─────┘
+   ┌────┴────┐                  ┌─────┴────┐                  ┌─────┴────┐
+   │   DEV   │                  │ STAGING  │                  │   PROD   │
+   │ 10.10.x │                  │ 10.20.x  │                  │ 10.30.x  │
+   │  2 AZs  │                  │  3 AZs   │                  │  3 AZs   │
+   │ NAT: 1  │                  │ NAT: 1   │                  │ NAT: 3   │
+   └────┬────┘                  └────┬─────┘                  └────┬─────┘
         │                            │                             │
-   ┌────┴────────────┐    ┌──────────┴──────────┐    ┌─────────────┴────────┐
-   │  EKS Cluster    │    │  EKS Cluster        │    │  EKS Cluster         │
-   │  + Karpenter    │    │  + Karpenter         │    │  + Karpenter         │
-   │  + ArgoCD       │    │  + ArgoCD            │    │  + ArgoCD            │
-   │  CPU limit: 2   │    │  CPU limit: 100      │    │  CPU limit: 100      │
-   │  Logs: api only │    │  Logs: api only      │    │  Logs: full (5 types)│
-   │  KMS: ✅        │    │  KMS: ✅              │    │  KMS: ✅ + Flow Logs │
-   └─────────────────┘    └─────────────────────┘    └──────────────────────┘
+   ┌────┴────────────┐    ┌──────────┴──────────-┐   ┌─────────────┴────────-┐
+   │  EKS Cluster    │    │  EKS Cluster         │   │  EKS Cluster          │
+   │  + Karpenter    │    │  + Karpenter         │   │   + Karpenter         │
+   │  + ArgoCD       │    │  + ArgoCD            │   │   + ArgoCD            │
+   │  CPU limit: 2   │    │  CPU limit: 100      │   │   CPU limit: 100      │
+   │  Logs: api only │    │  Logs: api only      │   │   Logs: full (5 types)│
+   │  KMS: ✅        │    │  KMS: ✅              │   │   KMS: ✅ + Flow Logs │
+   └─────────────────┘    └─────────────────────-┘   └──────────────────────-┘
 ```
 
 ### Data Flow
@@ -330,10 +330,10 @@ Each project component has its own detailed documentation:
 
 ```
                     ┌────────────────────────────────┐
-                    │      Developer creates PR       │
+                    │      Developer creates PR      │
                     └──────────────┬─────────────────┘
                                    │
-                    ┌──────────────▼─────────────────┐
+                    ┌──────────────▼─────────────────-┐
                     │   CI Workflow (ci.yml)          │
                     │                                 │
                     │  1. terraform fmt -check        │
@@ -343,24 +343,24 @@ Each project component has its own detailed documentation:
                     │  5. Gitleaks (secrets scan)     │
                     │  6. terraform plan (per env)    │
                     │  7. PR comment with results     │
-                    └──────────────┬─────────────────┘
+                    └──────────────┬─────────────────-┘
                                    │ merge
-                    ┌──────────────▼─────────────────┐
+                    ┌──────────────▼────────────────-─┐
                     │   CD Workflow (cd.yml)          │
                     │                                 │
                     │  1. Calculate SemVer tag        │
                     │  2. Create automatic Git Tag    │
                     │  3. terraform apply (per env)   │
                     │  4. Slack notification          │
-                    └────────────────────────────────┘
+                    └───────────────────────────────-─┘
 
-                    ┌────────────────────────────────┐
-                    │ Security Weekly (Sunday 8am)   │
+                    ┌────────────────────────────────-┐
+                    │ Security Weekly (Sunday 8am)    │
                     │                                 │
                     │  1. kube-bench (CIS)            │
                     │  2. Popeye (cluster sanity)     │
                     │  3. Kubescape (NSA/CISA)        │
-                    └────────────────────────────────┘
+                    └────────────────────────────────-┘
 ```
 
 ---
