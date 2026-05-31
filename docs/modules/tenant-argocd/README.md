@@ -1,6 +1,6 @@
 #  Módulo `tenant-argocd` — GitOps Multi-Tenant
 
-[<- Voltar ao README principal](../../../README.md)
+[← Voltar ao README principal](../../../README.md)
 
 ---
 
@@ -14,15 +14,15 @@ O módulo `tenant-argocd` instala o **ArgoCD** via Helm chart e configura **Appl
 
 ```
 modules/tenant-argocd/
- variables.tf        <- 9 variáveis (contrato do módulo)
- providers.tf        <- Helm + Kubectl + Kubernetes providers
- version.tf          <- Local infra_version para rastreabilidade
- namespace.tf        <- Namespace "argocd" com labels/annotations
- helm-release.tf     <- Helm release do ArgoCD
- values.yaml         <- Values: RBAC, Ingress ALB, Resources
- applicationsets.tf  <- 2 ApplicationSets (tenants + infra)
- projects.tf         <- 2 AppProjects (infra + tenants)
- outputs.tf          <- 5 outputs
+├── variables.tf        ← 9 variáveis (contrato do módulo)
+├── providers.tf        ← Helm + Kubectl + Kubernetes providers
+├── version.tf          ← Local infra_version para rastreabilidade
+├── namespace.tf        ← Namespace "argocd" com labels/annotations
+├── helm-release.tf     ← Helm release do ArgoCD
+├── values.yaml         ← Values: RBAC, Ingress ALB, Resources
+├── applicationsets.tf  ← 2 ApplicationSets (tenants + infra)
+├── projects.tf         ← 2 AppProjects (infra + tenants)
+└── outputs.tf          ← 5 outputs
 ```
 
 ---
@@ -42,7 +42,7 @@ variable "domain"                              { type = string, default = "" }  
 variable "tags"                                { type = map(string), default = {} }
 ```
 
-**Nota:** `admin_password_hash` é marcado como `sensitive = true` -> Terraform nunca exibe o valor no log.
+**Nota:** `admin_password_hash` é marcado como `sensitive = true` → Terraform nunca exibe o valor no log.
 
 ---
 
@@ -56,7 +56,7 @@ terraform {
 
   required_providers {
     kubectl = {
-      source  = "gavinbunney/kubectl"   # <- NÃO é hashicorp/kubectl (que não existe)
+      source  = "gavinbunney/kubectl"   # ← NÃO é hashicorp/kubectl (que não existe)
       version = "~> 1.14"
     }
     helm = {
@@ -126,9 +126,9 @@ resource "kubernetes_namespace_v1" "argocd" {
 ```
 
 **Por que tantos labels/annotations?**
-- **Labels** -> Usados para seleção (`kubectl get ns -l tenant=acme-corp`)
-- **Annotations** -> Metadata informativo (URL do repo, versão)
-- **`istio-injection = disabled`** -> Se Istio for instalado depois, não interfere no ArgoCD
+- **Labels** → Usados para seleção (`kubectl get ns -l tenant=acme-corp`)
+- **Annotations** → Metadata informativo (URL do repo, versão)
+- **`istio-injection = disabled`** → Se Istio for instalado depois, não interfere no ArgoCD
 
 ---
 
@@ -155,33 +155,33 @@ resource "helm_release" "argocd" {
 }
 ```
 
-**`templatefile`** -> Renderiza o `values.yaml` substituindo variáveis:
-- `${domain}` -> `argocd.acme-corp.com` ou `""`
-- `${tenant}` -> `acme-corp`
-- `${environment}` -> `dev`
-- `${admin_password_hash}` -> Hash bcrypt da senha admin
+**`templatefile`** → Renderiza o `values.yaml` substituindo variáveis:
+- `${domain}` → `argocd.acme-corp.com` ou `""`
+- `${tenant}` → `acme-corp`
+- `${environment}` → `dev`
+- `${admin_password_hash}` → Hash bcrypt da senha admin
 
 ---
 
 ### 5. `values.yaml` — Configuração Customizada do ArgoCD
 
 ```yaml
-#  Configuração Global 
+# ─── Configuração Global ────────────────────────────────────
 global:
   domain: ${domain}
 
 configs:
   params:
-    server.insecure: true           # <- TLS termina no ALB, não no ArgoCD
+    server.insecure: true           # ← TLS termina no ALB, não no ArgoCD
 
   cm:
     admin.enabled: true
-    timeout.reconciliation: 60s     # <- Verifica mudanças no Git a cada 60s
-    statusbadge.enabled: true       # <- Badges de status nos repos
+    timeout.reconciliation: 60s     # ← Verifica mudanças no Git a cada 60s
+    statusbadge.enabled: true       # ← Badges de status nos repos
 
-  #  RBAC: Controle de Acesso por Tenant 
+  # ─── RBAC: Controle de Acesso por Tenant ───────────────────
   rbac:
-    policy.default: role:readonly   # <- Quem não tem role, só lê
+    policy.default: role:readonly   # ← Quem não tem role, só lê
     policy.csv: |
       p, role:admin, applications, *, */*, allow
       p, role:admin, projects, *, *, allow
@@ -189,24 +189,24 @@ configs:
       p, role:admin, repositories, *, *, allow
       p, role:admin, logs, *, *, allow
       p, role:admin, exec, *, *, allow
-      g, ${tenant}-admin, role:admin   # <- Grupo do tenant tem acesso admin
+      g, ${tenant}-admin, role:admin   # ← Grupo do tenant tem acesso admin
 ```
 
 #### RBAC Explicado
 
 ```
 p, role:admin, applications, *, */*, allow
-                                  Ação: permitir
-                              Recursos: todos (*/*)
-                            Ação: todas (*)
-              Recurso tipo: applications
-   Role: admin
- p = policy
+│  │           │              │  │    └── Ação: permitir
+│  │           │              │  └────── Recursos: todos (*/*)
+│  │           │              └──────── Ação: todas (*)
+│  │           └──────────────────── Recurso tipo: applications
+│  └──────────────────────────────── Role: admin
+└─────────────────────────────────── p = policy
 
 g, acme-corp-admin, role:admin
-                   Mapeia para role:admin
-   Grupo: acme-corp-admin (vem do IdP/SSO)
- g = group binding
+│  │                └──── Mapeia para role:admin
+│  └──────────────────── Grupo: acme-corp-admin (vem do IdP/SSO)
+└─────────────────────── g = group binding
 ```
 
 #### Ingress ALB (Condicional)
@@ -214,7 +214,7 @@ g, acme-corp-admin, role:admin
 ```yaml
 server:
   ingress:
-    enabled: ${domain != ""}        # <- Só habilita se tiver domínio
+    enabled: ${domain != ""}        # ← Só habilita se tiver domínio
     annotations:
       kubernetes.io/ingress.class: alb
       alb.ingress.kubernetes.io/scheme: internet-facing
@@ -263,10 +263,10 @@ spec:
         repoURL: https://github.com/${tenant}/saas-platform.git
         revision: HEAD
         directories:
-          - path: tenants/*        # <- Cada pasta = 1 Application
+          - path: tenants/*        # ← Cada pasta = 1 Application
   template:
     metadata:
-      name: '{{path.basename}}'    # <- Nome do diretório vira nome do app
+      name: '{{path.basename}}'    # ← Nome do diretório vira nome do app
       labels:
         tenant: '{{path.basename}}'
         environment: '${environment}'
@@ -279,11 +279,11 @@ spec:
         namespace: '{{path.basename}}'
       syncPolicy:
         automated:
-          prune: true              # <- Remove recursos deletados do Git
-          selfHeal: true           # <- Corrige drifts automaticamente
+          prune: true              # ← Remove recursos deletados do Git
+          selfHeal: true           # ← Corrige drifts automaticamente
         syncOptions:
-          - CreateNamespace=true   # <- Cria namespace se não existir
-          - PruneLast=true         # <- Deleta por último (segurança)
+          - CreateNamespace=true   # ← Cria namespace se não existir
+          - PruneLast=true         # ← Deleta por último (segurança)
 ```
 
 **Como funciona:**
@@ -291,17 +291,17 @@ spec:
 ```
 repositório Git:
   saas-platform/
-   tenants/
-       customer-a/        ->  Application: customer-a (namespace: customer-a)
-          deployment.yaml
-          service.yaml
-       customer-b/        ->  Application: customer-b (namespace: customer-b)
-          kustomization.yaml
-       customer-c/        ->  Application: customer-c (namespace: customer-c)
-           helm/Chart.yaml
+  └── tenants/
+      ├── customer-a/        →  Application: customer-a (namespace: customer-a)
+      │   ├── deployment.yaml
+      │   └── service.yaml
+      ├── customer-b/        →  Application: customer-b (namespace: customer-b)
+      │   └── kustomization.yaml
+      └── customer-c/        →  Application: customer-c (namespace: customer-c)
+          └── helm/Chart.yaml
 ```
 
-**Onboarding de novo tenant:** Basta criar uma pasta em `tenants/` no Git -> ArgoCD cria tudo automaticamente.
+**Onboarding de novo tenant:** Basta criar uma pasta em `tenants/` no Git → ArgoCD cria tudo automaticamente.
 
 #### ApplicationSet 2: `infra-apps` (Generator: List)
 
@@ -367,7 +367,7 @@ spec:
     - namespace: 'kube-system'
   clusterResourceWhitelist:
     - group: '*'
-      kind: '*'           # <- Pode criar CRDs, ClusterRoles, etc.
+      kind: '*'           # ← Pode criar CRDs, ClusterRoles, etc.
 ```
 
 #### AppProject: `tenants`
@@ -378,34 +378,34 @@ spec:
   sourceRepos:
     - 'https://github.com/${tenant}/saas-platform.git'
   destinations:
-    - namespace: '*'       # <- Qualquer namespace
+    - namespace: '*'       # ← Qualquer namespace
   clusterResourceWhitelist:
     - group: ''
       kind: 'Namespace'
       kind: 'ResourceQuota'
-      kind: 'LimitRange'   # <- APENAS estes cluster resources
+      kind: 'LimitRange'   # ← APENAS estes cluster resources
   namespaceResourceWhitelist:
     - group: '*'
-      kind: '*'            # <- Dentro do namespace, pode tudo
+      kind: '*'            # ← Dentro do namespace, pode tudo
 ```
 
 **Segurança do isolamento:**
 
 ```
- AppProject: infra 
-  Pode criar: CRDs, ClusterRoles, etc.         
-  Repos: apenas Helm charts oficiais            
-  Namespaces: ingress-nginx, cert-manager, etc. 
-  Não pode: acessar namespaces de tenants       
+┌─── AppProject: infra ──────────────────────────┐
+│  Pode criar: CRDs, ClusterRoles, etc.         │
+│  Repos: apenas Helm charts oficiais            │
+│  Namespaces: ingress-nginx, cert-manager, etc. │
+│  Não pode: acessar namespaces de tenants       │
+└──────────────────────────────────────────────────┘
 
-
- AppProject: tenants 
-  Pode criar: Deployments, Services, etc.       
-  Pode criar: Namespaces, ResourceQuotas         
-  Não pode: criar CRDs, ClusterRoles             
-  Não pode: acessar outros repos                  
- -> Isolamento zero-trust por projeto              
-
+┌─── AppProject: tenants ────────────────────────┐
+│  Pode criar: Deployments, Services, etc.       │
+│  Pode criar: Namespaces, ResourceQuotas         │
+│  Não pode: criar CRDs, ClusterRoles             │
+│  Não pode: acessar outros repos                  │
+│ → Isolamento zero-trust por projeto              │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
@@ -425,33 +425,33 @@ output "appset_tenants_name"   # "tenant-apps"
 ##  Diagrama do ArgoCD
 
 ```
- ArgoCD 
-                                                                         
-    Helm Release (argo-cd 7.8.0)  
-     Server    Controller    RepoServer    Redis    AppSet Ctrl  
-    
-                                                                         
-    AppProject: infra    AppProject: tenants  
-     Repos: Helm charts oficiais    Repos: github.com/${tenant}   
-     NS: ingress, cert-mgr...      NS: * (com restrições)         
-      
-                                                                       
-      
-     ApplicationSet: infra-apps      ApplicationSet: tenant-apps   
-     Generator: LIST                 Generator: GIT (directories)  
-                                                                    
-     -> ingress-nginx    4.12.0       -> tenants/customer-a/         
-     -> cert-manager     1.17.0       -> tenants/customer-b/         
-     -> metrics-server   3.12.2       -> tenants/customer-c/         
-     -> cluster-autoscaler 9.46.0     -> (auto-detecta novas pastas) 
-     -> aws-lb-controller 1.10.1                                     
-      
-                                                                         
-    RBAC   
-     Default: role:readonly (todos vêem, ninguém mexe)                
-     ${tenant}-admin -> role:admin (acesso total ao tenant)            
-     
-
+┌─────────────────────────────── ArgoCD ─────────────────────────────────┐
+│                                                                         │
+│   ┌─── Helm Release (argo-cd 7.8.0) ────────────────────────────────┐ │
+│   │  Server  │  Controller  │  RepoServer  │  Redis  │  AppSet Ctrl │ │
+│   └──────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+│   ┌─── AppProject: infra ──────┐  ┌─── AppProject: tenants ────────┐ │
+│   │  Repos: Helm charts oficiais│  │  Repos: github.com/${tenant}  │ │
+│   │  NS: ingress, cert-mgr...  │  │  NS: * (com restrições)        │ │
+│   └──────────────┬──────────────┘  └──────────────┬─────────────────┘ │
+│                   │                                │                    │
+│   ┌───────────────▼──────────────┐  ┌─────────────▼─────────────────┐ │
+│   │  ApplicationSet: infra-apps  │  │  ApplicationSet: tenant-apps  │ │
+│   │  Generator: LIST             │  │  Generator: GIT (directories) │ │
+│   │                              │  │                                │ │
+│   │  → ingress-nginx    4.12.0   │  │  → tenants/customer-a/        │ │
+│   │  → cert-manager     1.17.0   │  │  → tenants/customer-b/        │ │
+│   │  → metrics-server   3.12.2   │  │  → tenants/customer-c/        │ │
+│   │  → cluster-autoscaler 9.46.0 │  │  → (auto-detecta novas pastas)│ │
+│   │  → aws-lb-controller 1.10.1  │  │                                │ │
+│   └──────────────────────────────┘  └────────────────────────────────┘ │
+│                                                                         │
+│   ┌─── RBAC ────────────────────────────────────────────────────────┐  │
+│   │  Default: role:readonly (todos vêem, ninguém mexe)              │  │
+│   │  ${tenant}-admin → role:admin (acesso total ao tenant)          │  │
+│   └─────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -493,4 +493,4 @@ module "tenant_argocd" {
 
 ---
 
-[<- Voltar ao README principal](../../../README.md)
+[← Voltar ao README principal](../../../README.md)

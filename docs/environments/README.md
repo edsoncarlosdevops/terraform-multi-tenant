@@ -1,6 +1,6 @@
 #  Environments — Dev, Staging e Prod
 
-[<- Voltar ao README principal](../../README.md)
+[← Voltar ao README principal](../../README.md)
 
 ---
 
@@ -10,9 +10,9 @@ Os environments são as **instanciações concretas** dos módulos. Cada environ
 
 ```
 environments/
- dev/            <- Custo mínimo, desenvolvimento rápido
- staging/        <- Balanceado, validação antes de prod
- prod/           <- Alta disponibilidade, segurança máxima
+├── dev/            ← Custo mínimo, desenvolvimento rápido
+├── staging/        ← Balanceado, validação antes de prod
+└── prod/           ← Alta disponibilidade, segurança máxima
 ```
 
 ---
@@ -53,13 +53,13 @@ environments/
 O `main.tf` do dev é o mais completo — orquestra os 3 módulos:
 
 ```hcl
-# 
+# ═══════════════════════════════════════════════════
 # ORDEM DE EXECUÇÃO RECOMENDADA:
 #   Apply #1: terraform apply -target=module.tenant_network \
 #                              -target=module.tenant_eks
 #   ⏳ Aguarda ~15 min o cluster EKS ficar ACTIVE
 #   Apply #2: terraform apply (instala Karpenter + ArgoCD)
-# 
+# ═══════════════════════════════════════════════════
 
 terraform {
   backend "s3" {
@@ -80,7 +80,7 @@ provider "kubectl" {
 }
 
 # Cadeia de dependências:
-# tenant_network -> tenant_eks -> tenant_argocd
+# tenant_network → tenant_eks → tenant_argocd
 module "tenant_network" { ... }
 module "tenant_eks"     { ... }     # Depende de network
 module "tenant_argocd"  { ... }     # Depende de EKS
@@ -103,7 +103,7 @@ vpc = {
   azs                = ["us-east-1a", "us-east-1b"]
   public_subnets     = ["10.10.1.0/24", "10.10.2.0/24"]
   private_subnets    = ["10.10.10.0/24", "10.10.11.0/24"]
-  enable_nat_gateway = false    # <- SEM NAT: custo zero de rede
+  enable_nat_gateway = false    # ← SEM NAT: custo zero de rede
   single_nat_gateway = true
 }
 
@@ -160,11 +160,11 @@ environment = "staging"
 
 vpc = {
   cidr               = "10.20.0.0/16"
-  azs                = ["us-east-1a", "us-east-1b", "us-east-1c"]    # <- 3 AZs
+  azs                = ["us-east-1a", "us-east-1b", "us-east-1c"]    # ← 3 AZs
   public_subnets     = ["10.20.1.0/24", "10.20.2.0/24", "10.20.3.0/24"]
   private_subnets    = ["10.20.10.0/24", "10.20.11.0/24", "10.20.12.0/24"]
   enable_nat_gateway = true
-  single_nat_gateway = true     # <- Apenas 1 NAT (economia)
+  single_nat_gateway = true     # ← Apenas 1 NAT (economia)
 }
 
 tags = {
@@ -216,7 +216,7 @@ vpc = {
   public_subnets     = ["10.30.1.0/24", "10.30.2.0/24", "10.30.3.0/24"]
   private_subnets    = ["10.30.10.0/24", "10.30.11.0/24", "10.30.12.0/24"]
   enable_nat_gateway = true
-  single_nat_gateway = false    # <- NAT por AZ para HA
+  single_nat_gateway = false    # ← NAT por AZ para HA
 }
 ```
 
@@ -236,23 +236,23 @@ output "vpc_flow_log_group" {
 
 ```
                     10.0.0.0/8 (Espaço privado)
-                         
-    
-                                            
+                         │
+    ┌────────────────────┼────────────────────┐
+    │                    │                    │
 10.10.0.0/16         10.20.0.0/16        10.30.0.0/16
     DEV                STAGING              PROD
-                                            
-                  
-Public            Public             Public    
-.1.0              .1.0               .1.0      
-.2.0              .2.0               .2.0      
-                  .3.0               .3.0      
-                  
-Private           Private            Private   
-.10.0             .10.0              .10.0     
-.11.0             .11.0              .11.0     
-                  .12.0              .12.0     
-                  
+    │                    │                    │
+┌───┴───┐          ┌─────┴─────┐        ┌─────┴─────┐
+│Public │          │ Public    │        │ Public    │
+│.1.0   │          │ .1.0      │        │ .1.0      │
+│.2.0   │          │ .2.0      │        │ .2.0      │
+│       │          │ .3.0      │        │ .3.0      │
+├───────┤          ├───────────┤        ├───────────┤
+│Private│          │ Private   │        │ Private   │
+│.10.0  │          │ .10.0     │        │ .10.0     │
+│.11.0  │          │ .11.0     │        │ .11.0     │
+│       │          │ .12.0     │        │ .12.0     │
+└───────┘          └───────────┘        └───────────┘
 ```
 
 **Por que CIDRs separados?**
@@ -324,4 +324,4 @@ module "tenant_argocd" {
 
 ---
 
-[<- Voltar ao README principal](../../README.md)
+[← Voltar ao README principal](../../README.md)

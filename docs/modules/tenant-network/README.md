@@ -1,6 +1,6 @@
 #  Módulo `tenant-network` — VPC Multi-Tenant
 
-[<- Voltar ao README principal](../../../README.md)
+[← Voltar ao README principal](../../../README.md)
 
 ---
 
@@ -16,14 +16,14 @@ O módulo `tenant-network` cria toda a **infraestrutura de rede** para um tenant
 
 ```
 modules/tenant-network/
- main.tf           <- VPC + Internet Gateway + locals
- variables.tf      <- 4 variáveis (contrato do módulo)
- subnets.tf        <- Subnets públicas e privadas
- nat-gateway.tf    <- Elastic IP + NAT Gateway condicional
- routing.tf        <- Route tables públicas/privadas + associações
- endpoints.tf      <- VPC Endpoints (Gateway: S3/DynamoDB + Interface: ECR/Logs)
- flow-logs.tf      <- VPC Flow Logs + IAM Role (apenas prod)
- outputs.tf        <- 8 outputs
+├── main.tf           ← VPC + Internet Gateway + locals
+├── variables.tf      ← 4 variáveis (contrato do módulo)
+├── subnets.tf        ← Subnets públicas e privadas
+├── nat-gateway.tf    ← Elastic IP + NAT Gateway condicional
+├── routing.tf        ← Route tables públicas/privadas + associações
+├── endpoints.tf      ← VPC Endpoints (Gateway: S3/DynamoDB + Interface: ECR/Logs)
+├── flow-logs.tf      ← VPC Flow Logs + IAM Role (apenas prod)
+└── outputs.tf        ← 8 outputs
 ```
 
 ---
@@ -65,7 +65,7 @@ variable "tags" {
 ###  Sobre o tipo `object`
 
 O uso de `object` com `optional` é uma prática avançada do Terraform:
-- **`optional(bool, true)`** -> Se não passar a variável, o default é `true`
+- **`optional(bool, true)`** → Se não passar a variável, o default é `true`
 - Permite validação em tempo de `plan` (tipagem forte)
 - Evita variáveis avulsas — todas as configs de VPC ficam agrupadas
 
@@ -110,7 +110,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.this.id
   cidr_block              = var.vpc.public_subnets[count.index]
   availability_zone       = local.azs[count.index % length(local.azs)]
-  map_public_ip_on_launch = true     # <- IP público automático
+  map_public_ip_on_launch = true     # ← IP público automático
 }
 
 resource "aws_subnet" "private" {
@@ -125,14 +125,14 @@ resource "aws_subnet" "private" {
 
 ```
 # Com 3 subnets e 2 AZs:
-# count.index=0 -> AZ[0 % 2] = AZ[0] = us-east-1a
-# count.index=1 -> AZ[1 % 2] = AZ[1] = us-east-1b
-# count.index=2 -> AZ[2 % 2] = AZ[0] = us-east-1a  (volta ao início)
+# count.index=0 → AZ[0 % 2] = AZ[0] = us-east-1a
+# count.index=1 → AZ[1 % 2] = AZ[1] = us-east-1b
+# count.index=2 → AZ[2 % 2] = AZ[0] = us-east-1a  (volta ao início)
 ```
 
 **Tags importantes:**
-- `Tier = "public"` ou `Tier = "private"` -> Usado para filtrar subnets no console AWS
-- `Tenant` e `Environment` -> Rastreabilidade e cost allocation
+- `Tier = "public"` ou `Tier = "private"` → Usado para filtrar subnets no console AWS
+- `Tenant` e `Environment` → Rastreabilidade e cost allocation
 
 ---
 
@@ -151,7 +151,7 @@ resource "aws_eip" "nat" {
 resource "aws_nat_gateway" "this" {
   count = var.vpc.enable_nat_gateway ? (
     var.vpc.single_nat_gateway ? 1 : length(local.azs)
-  ) : 0    # <- Se enable_nat_gateway=false, cria ZERO NATs
+  ) : 0    # ← Se enable_nat_gateway=false, cria ZERO NATs
 }
 ```
 
@@ -163,7 +163,7 @@ resource "aws_nat_gateway" "this" {
 | `true` | `true` | **1 NAT** | ~$32 |
 | `true` | `false` | **N NATs** (1 por AZ) | ~$96 (3 AZs) |
 
-**`depends_on = [aws_internet_gateway.this]`** -> O NAT precisa do IGW para funcionar. Sem isso, o Terraform pode tentar criar o NAT antes do IGW.
+**`depends_on = [aws_internet_gateway.this]`** → O NAT precisa do IGW para funcionar. Sem isso, o Terraform pode tentar criar o NAT antes do IGW.
 
 ---
 
@@ -183,7 +183,7 @@ resource "aws_route_table" "private" {
   count = var.vpc.single_nat_gateway ? 1 : length(local.azs)
 
   dynamic "route" {
-    for_each = var.vpc.enable_nat_gateway ? [1] : []   # <- Rota condicional
+    for_each = var.vpc.enable_nat_gateway ? [1] : []   # ← Rota condicional
     content {
       cidr_block     = "0.0.0.0/0"
       nat_gateway_id = var.vpc.single_nat_gateway ?
@@ -195,8 +195,8 @@ resource "aws_route_table" "private" {
 ```
 
 **Bloco `dynamic "route"`:**
-- Se `enable_nat_gateway = false` -> `for_each = []` -> **nenhuma rota é criada**
-- Se `enable_nat_gateway = true` -> `for_each = [1]` -> **1 rota para o NAT**
+- Se `enable_nat_gateway = false` → `for_each = []` → **nenhuma rota é criada**
+- Se `enable_nat_gateway = true` → `for_each = [1]` → **1 rota para o NAT**
 
 **Associações:**
 - Cada subnet pública é associada à route table pública
@@ -234,7 +234,7 @@ resource "aws_vpc_endpoint" "dynamodb" {
 
 ```hcl
 resource "aws_vpc_endpoint" "ecr_api" {
-  count = var.environment == "prod" ? 1 : 0   # <- Só em prod
+  count = var.environment == "prod" ? 1 : 0   # ← Só em prod
 
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
@@ -255,7 +255,7 @@ ingress {
   from_port   = 443
   to_port     = 443
   protocol    = "tcp"
-  cidr_blocks = [var.vpc.cidr]   # <- Apenas tráfego de dentro da VPC
+  cidr_blocks = [var.vpc.cidr]   # ← Apenas tráfego de dentro da VPC
 }
 ```
 
@@ -279,22 +279,22 @@ resource "aws_flow_log" "this" {
 **O que é capturado (exemplo):**
 ```
 2 123456789012 eni-abc123 10.10.1.5 52.94.76.7 443 49152 6 25 20000 ACCEPT
-                                                           Aceito
-                                                      Bytes
-                                                    Pacotes
-                                                   Protocolo (TCP)
-                                              Porta destino
-                                           Porta origem
-                                 IP destino
-                        IP origem
-              ENI
-  Account ID
- Versão
+│ │            │          │         │          │   │     │ │  │     └─ Aceito
+│ │            │          │         │          │   │     │ │  └─── Bytes
+│ │            │          │         │          │   │     │ └──── Pacotes
+│ │            │          │         │          │   │     └───── Protocolo (TCP)
+│ │            │          │         │          │   └────────── Porta destino
+│ │            │          │         │          └─────────────── Porta origem
+│ │            │          │         └──────────────────────── IP destino
+│ │            │          └──────────────────────────────── IP origem
+│ │            └─────────────────────────────────────────── ENI
+│ └──────────────────────────────────────────────────────── Account ID
+└────────────────────────────────────────────────────────── Versão
 ```
 
 **IAM Role dedicada:**
 - Usa **mínimo privilégio** — apenas permissões de CloudWatch Logs
-- `assume_role_policy` -> Apenas o serviço `vpc-flow-logs.amazonaws.com` pode assumir
+- `assume_role_policy` → Apenas o serviço `vpc-flow-logs.amazonaws.com` pode assumir
 
 **CloudWatch Log Group:**
 - Retenção: **90 dias** (custo-eficiente para compliance)
@@ -321,32 +321,32 @@ output "vpc_flow_log_group"   { value = try(aws_cloudwatch_log_group.flow_logs[0
 ##  Diagrama de Rede
 
 ```
- VPC (10.x.0.0/16) 
-                                                                                  
-    AZ-a    AZ-b    AZ-c 
-                                                                            
-      Public       Public       Public  
-      10.x.1.0/24            10.x.2.0/24            10.x.3.0/24 
-      map_public_ip=yes       map_public_ip=yes                    
-        NAT GW                                             
-                              
-                                                           
-                                                                           
-      Private       Private       Private  
-      10.x.10.0/24           10.x.11.0/24           10.x.12.0/24 
-      [EKS Nodes]            [EKS Nodes]            [EKS Nodes]  
-                
-       
-                                                                                  
-    VPC Endpoints 
-    S3 (Gateway)  FREE    DynamoDB (Gateway)  FREE                         
-    ECR (Interface)  PROD  Logs (Interface)  PROD                         
-   
-                                                                                  
-    Internet Gateway       Flow Logs  
-    Público -> Subnets pub          PROD ONLY -> CloudWatch (90 dias)      
-         
-
+┌─────────────────────────────── VPC (10.x.0.0/16) ───────────────────────────────┐
+│                                                                                  │
+│   ┌─── AZ-a ───────────────┐  ┌─── AZ-b ───────────────┐  ┌─── AZ-c ─────────┐│
+│   │                         │  │                         │  │                   ││
+│   │  ┌─── Public ────────┐ │  │  ┌─── Public ────────┐ │  │  ┌─── Public ──┐ ││
+│   │  │ 10.x.1.0/24      │ │  │  │ 10.x.2.0/24      │ │  │  │ 10.x.3.0/24│ ││
+│   │  │ map_public_ip=yes │ │  │  │ map_public_ip=yes │ │  │  │             │ ││
+│   │  │  ┌─── NAT GW ──┐ │ │  │  │                   │ │  │  │             │ ││
+│   │  └──┤              ├─┘ │  │  └───────────────────┘ │  │  └─────────────┘ ││
+│   │     └──────┬───────┘   │  │                         │  │                   ││
+│   │            │            │  │                         │  │                   ││
+│   │  ┌─── Private ──────┐ │  │  ┌─── Private ──────┐ │  │  ┌─── Private ──┐ ││
+│   │  │ 10.x.10.0/24     │ │  │  │ 10.x.11.0/24     │ │  │  │ 10.x.12.0/24│ ││
+│   │  │ [EKS Nodes]      │ │  │  │ [EKS Nodes]      │ │  │  │ [EKS Nodes] │ ││
+│   │  └──────────────────┘ │  │  └──────────────────┘ │  │  └─────────────┘ ││
+│   └─────────────────────────┘  └─────────────────────────┘  └─────────────────┘│
+│                                                                                  │
+│   ┌─── VPC Endpoints ──────────────────────────────────────────────────────────┐│
+│   │ S3 (Gateway)  FREE    DynamoDB (Gateway)  FREE                         ││
+│   │ ECR (Interface)  PROD  Logs (Interface)  PROD                         ││
+│   └────────────────────────────────────────────────────────────────────────────┘│
+│                                                                                  │
+│   ┌─── Internet Gateway ────┐     ┌─── Flow Logs ────────────────────────────┐ │
+│   │ Público → Subnets pub   │     │  PROD ONLY → CloudWatch (90 dias)     │ │
+│   └──────────────────────────┘     └──────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -395,4 +395,4 @@ module "tenant_network" {
 
 ---
 
-[<- Voltar ao README principal](../../../README.md)
+[← Voltar ao README principal](../../../README.md)

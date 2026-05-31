@@ -1,4 +1,4 @@
-#  Infraestrutura SaaS Multi-Tenant — AWS + Terraform + EKS + ArgoCD
+# ️ SaaS Multi-Tenant Infrastructure — AWS + Terraform + EKS + ArgoCD
 
 <p align="center">
   <img src="https://img.shields.io/badge/Terraform-%3E%3D1.6-7B42BC?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform">
@@ -9,218 +9,221 @@
   <img src="https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white" alt="CI/CD">
 </p>
 
+> 🇧🇷 [Leia em Português](README.pt-br.md)
+
 <p align="center">
-  <b>Infraestrutura SaaS production-ready com isolamento total por tenant, GitOps, escalonamento inteligente e segurança em camadas.</b>
+  <b>Production-ready SaaS infrastructure with full tenant isolation, GitOps, intelligent scaling, and layered security.</b>
 </p>
 
 <p align="center">
-  <img src="docs/architecture/architecture-diagram.png" alt="Diagrama de Arquitetura" width="900">
+  <img src="docs/architecture/architecture-diagram.png" alt="Architecture Diagram" width="900">
 </p>
 
 ---
 
-##  Índice
+##  Table of Contents
 
-- [Visão Geral](#-visão-geral)
-- [Arquitetura](#-arquitetura)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Pré-Requisitos](#-pré-requisitos)
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Project Structure](#-project-structure)
+- [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
-- [Documentação por Seção](#-documentação-por-seção)
-- [Comparativo de Ambientes](#-comparativo-de-ambientes)
-- [Pipeline CI/CD](#-pipeline-cicd)
-- [Segurança](#-segurança)
-- [FinOps — Otimização de Custos](#-finops--otimização-de-custos)
-- [Versionamento SemVer](#-versionamento-semver)
-- [Stack Tecnológica](#-stack-tecnológica)
-- [Próximos Passos](#-próximos-passos)
-- [Licença](#-licença)
+- [Documentation by Section](#-documentation-by-section)
+- [Environment Comparison](#-environment-comparison)
+- [CI/CD Pipeline](#-cicd-pipeline)
+- [Security](#-security)
+- [FinOps — Cost Optimization](#-finops--cost-optimization)
+- [SemVer Versioning](#-semver-versioning)
+- [Technology Stack](#-technology-stack)
+- [Next Steps](#-next-steps)
+- [License](#-license)
 
 ---
 
-##  Visão Geral
+##  Overview
 
-Este projeto implementa uma **infraestrutura SaaS multi-tenant completa na AWS** usando o modelo **Silo** (VPC dedicada por tenant). Cada tenant recebe seu próprio conjunto isolado de recursos:
+This project implements a **complete SaaS multi-tenant infrastructure on AWS** using the **Silo Model** (dedicated VPC per tenant). Each tenant receives its own isolated set of resources:
 
-| Camada | Tecnologia | Função |
-|--------|-----------|--------|
-| **Rede** | VPC + Subnets + NAT + Endpoints | Isolamento de rede L3 por tenant |
-| **Compute** | EKS + Managed Node Groups | Kubernetes gerenciado pela AWS |
-| **Escalonamento** | Karpenter (Spot + On-Demand) | Auto-scaling inteligente com otimização de custo |
-| **GitOps** | ArgoCD + ApplicationSets | Deploy contínuo declarativo multi-tenant |
-| **Estado** | S3 + DynamoDB | Backend remoto com state locking |
-| **CI/CD** | GitHub Actions (6 workflows) | Plan, Apply, Security, Versioning |
-| **Segurança** | Checkov, Trivy, Gitleaks, kube-bench | SAST em PRs + DAST semanal |
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Network** | VPC + Subnets + NAT + Endpoints | L3 network isolation per tenant |
+| **Compute** | EKS + Managed Node Groups | AWS-managed Kubernetes |
+| **Scaling** | Karpenter (Spot + On-Demand) | Intelligent auto-scaling with cost optimization |
+| **GitOps** | ArgoCD + ApplicationSets | Declarative continuous deployment for multi-tenant |
+| **State** | S3 + DynamoDB | Remote backend with state locking |
+| **CI/CD** | GitHub Actions (3 workflows) | Plan, Apply, Security, Versioning |
+| **Security** | Checkov, Trivy, Gitleaks, kube-bench | SAST on PRs + weekly DAST |
 
-###  Decisões-Chave
+###  Key Design Decisions
 
-- **Modelo Silo**: Cada tenant recebe uma VPC dedicada -> isolamento total, sem noisy neighbor
-- **Módulos Reutilizáveis**: 3 módulos (`tenant-network`, `tenant-eks`, `tenant-argocd`) com contratos enxutos
-- **Custo Progressivo**: Dev = $0/mês (sem NAT) -> Staging = balanceado -> Prod = HA completa
-- **GitOps Nativo**: ArgoCD com ApplicationSets gerencia apps de infra e de tenant automaticamente
-- **Segurança em Camadas**: SAST em todo PR + DAST semanal no cluster
+- **Silo Model**: Each tenant gets a dedicated VPC → full isolation, no noisy neighbor
+- **Reusable Modules**: 3 modules (`tenant-network`, `tenant-eks`, `tenant-argocd`) with lean contracts
+- **Progressive Cost**: Dev ~$108/mo (1 NAT) → Staging = balanced → Prod = full HA
+- **Native GitOps**: ArgoCD with ApplicationSets manages infra and tenant apps automatically
+- **Layered Security**: SAST on every PR + weekly DAST on cluster
 
 ---
 
-##  Arquitetura
+## ️ Architecture
 
 ```
-
-                              GITHUB ACTIONS                                
-            
-   CI: Plan    CD: Apply     Security    Infracost   Tag/SemVer  
-            
-
-                                                                
-        
-                                      
-                              
-                                AWS Account  
-                                (us-east-1)  
-                              
-                                      
-        
-                                                                  
-                                      
-      DEV                      STAGING                      PROD   
-    10.10.x                    10.20.x                    10.30.x  
-     2 AZs                      3 AZs                      3 AZs   
-    NAT:                     NAT: 1                     NAT: 3   
-                                      
-                                                                 
-           
-     EKS Cluster          EKS Cluster              EKS Cluster         
-     + Karpenter          + Karpenter               + Karpenter         
-     + ArgoCD             + ArgoCD                  + ArgoCD            
-     CPU limit: 2         CPU limit: 100            CPU limit: 100      
-     Logs: api only       Logs: api only            Logs: full (5 tipos)
-     KMS:               KMS:                     KMS:  + Flow Logs 
-           
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              GITHUB ACTIONS                                 │
+│  ┌──────────┐  ┌───────────┐  ┌───────────┐  ┌──────────┐  ┌───────────┐    │
+│  │ CI: Plan │  │ CD: Apply │  │  Security │  │ Infracost│  │ Tag/SemVer│    │
+│  └────┬─────┘  └─────┬─────┘  └─────┬─────┘  └────┬─────┘  └─────┬─────┘    │
+└───────┼──────────────┼──────────────┼──────────────┼──────────────┼────────-┘
+        │              │              │              │              │
+        └──────────────┴──────────────┴──────────────┴──────────────┘
+                                      │
+                              ┌───────┴───────┐
+                              │  AWS Account  │
+                              │  (us-east-1)  │
+                              └───────┬───────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        │                             │                             │
+   ┌────┴────┐                  ┌─────┴────┐                  ┌─────┴────┐
+   │   DEV   │                  │ STAGING  │                  │   PROD   │
+   │ 10.10.x │                  │ 10.20.x  │                  │ 10.30.x  │
+   │  2 AZs  │                  │  3 AZs   │                  │  3 AZs   │
+   │ NAT: 1  │                  │ NAT: 1   │                  │ NAT: 3   │
+   └────┬────┘                  └────┬─────┘                  └────┬─────┘
+        │                            │                             │
+   ┌────┴────────────┐    ┌──────────┴──────────-┐   ┌─────────────┴────────-┐
+   │  EKS Cluster    │    │  EKS Cluster         │   │  EKS Cluster          │
+   │  + Karpenter    │    │  + Karpenter         │   │   + Karpenter         │
+   │  + ArgoCD       │    │  + ArgoCD            │   │   + ArgoCD            │
+   │  CPU limit: 2   │    │  CPU limit: 100      │   │   CPU limit: 100      │
+   │  Logs: api only │    │  Logs: api only      │   │   Logs: full (5 types)│
+   │  KMS:         │    │  KMS:               │   │   KMS:  + Flow Logs │
+   └─────────────────┘    └─────────────────────-┘   └──────────────────────-┘
 ```
 
-### Fluxo de Dados
+### Data Flow
 
 ```
-Developer -> Git Push -> PR -> CI (lint + SAST + plan)
+Developer → Git Push → PR → CI (lint + SAST + plan)
                             ↓ merge
                          CD (tag + apply + Slack)
                             ↓
-                    ArgoCD detecta mudanças
+                    ArgoCD detects changes
                             ↓
-                   Sync automático nos pods
+                   Automatic sync to pods
 ```
 
 ---
 
-##  Estrutura do Projeto
+##  Project Structure
 
 ```
 terraform-multi-tenant/
-
-  README.md                              <- Você está aqui
-  CODIGO_COMPLETO.txt                    <- Dump de referência do código
-  .gitignore                             <- Ignora .terraform, secrets, logs
-
-  bootstrap/                            <- Setup inicial (rodar 1x)
-    main.tf                                 S3 bucket + DynamoDB table
-    provider.tf                              AWS provider us-east-1
-
-  modules/                               <- Módulos reutilizáveis
-   
-     tenant-network/                   <- Módulo de Rede (8 arquivos)
-       main.tf                              VPC + Internet Gateway
-       variables.tf                         4 variáveis (contrato)
-       subnets.tf                           Subnets públicas + privadas
-       nat-gateway.tf                       NAT condicional (0, 1 ou N)
-       routing.tf                           Route tables + associações
-       endpoints.tf                         VPC Endpoints (Gateway + Interface)
-       flow-logs.tf                         Flow Logs + IAM (só prod)
-       outputs.tf                           vpc_id, subnet_ids, nat_ids...
-   
-      tenant-eks/                       <- Módulo EKS (8 arquivos)
-       main.tf                              Cluster EKS + KMS + CloudWatch + SG
-       variables.tf                         14 variáveis (contrato)
-       providers.tf                         Provider kubectl (gavinbunney)
-       iam.tf                               3 IAM Roles (cluster, node, karpenter)
-       node-group.tf                        Node Group On-Demand principal
-       karpenter.tf                         EC2NodeClass + NodePool + Subnet Tags
-       wait-for-cluster.tf                  Aguarda cluster ACTIVE + nodes READY
-       outputs.tf                           cluster_id, endpoint, ARNs...
-   
-     tenant-argocd/                    <- Módulo ArgoCD (9 arquivos)
-        variables.tf                         9 variáveis (contrato)
-        providers.tf                         Helm + Kubectl + Kubernetes
-        version.tf                           Local infra_version
-        namespace.tf                         Namespace argocd com labels
-        helm-release.tf                      Helm release do ArgoCD
-        values.yaml                          Values: RBAC, Ingress, Resources
-        applicationsets.tf                   2 AppSets (tenants + infra)
-        projects.tf                          2 AppProjects (infra + tenants)
-        outputs.tf                           namespace, server, appset names
-
-  environments/                          <- Configurações por ambiente
-    dev/                                     Custo ZERO: sem NAT, sem flow logs
-       main.tf                              Orquestrador: network -> EKS -> ArgoCD
-       variables.tf                         7 variáveis do ambiente
-       terraform.tfvars                     10.10.0.0/16, 2 AZs, NAT=false
-       outputs.tf                           10 outputs
-    staging/                                 Balanceado: 1 NAT, endpoints básicos
-       main.tf                              Apenas módulo network (por enquanto)
-       variables.tf                         4 variáveis
-       terraform.tfvars                     10.20.0.0/16, 3 AZs, NAT=1
-       outputs.tf                           4 outputs
-    prod/                                    HA: NAT por AZ, flow logs, endpoints
-        main.tf                              Apenas módulo network (por enquanto)
-        variables.tf                         4 variáveis
-        terraform.tfvars                     10.30.0.0/16, 3 AZs, NAT=3
-        outputs.tf                           5 outputs
-
-   .github/workflows/                   <- Pipelines CI/CD
-    ci.yml                                   CI unificado: fmt + lint + SAST + plan
-    cd.yml                                   CD unificado: tag + apply + Slack
-    security-weekly.yml                      DAST semanal: kube-bench + Popeye
-
-  scripts/                               <- Scripts utilitários
-    setup-github.sh                          Prepara repo para primeiro push
-    version.sh                               Versionamento SemVer local
-
-  docs/                                  <- Documentação adicional
-     github-actions-setup.md                  Guia: IAM OIDC + Secrets + Environments
-     bootstrap/README.md                      Doc: Backend S3/DynamoDB
-     modules/
-        tenant-network/README.md             Doc: Módulo de rede
-        tenant-eks/README.md                 Doc: Módulo EKS
-        tenant-argocd/README.md              Doc: Módulo ArgoCD
-     environments/README.md                   Doc: Ambientes dev/staging/prod
-     ci-cd/README.md                          Doc: Workflows GitHub Actions
-     scripts/README.md                        Doc: Scripts utilitários
-     architecture/README.md                   Doc: Decisões de arquitetura
+│
+├──  README.md                              ← You are here
+├──  CODIGO_COMPLETO.txt                    ← Code reference dump
+├──  .gitignore                             ← Ignores .terraform, secrets, logs
+│
+├──  bootstrap/                            ← Initial setup (run once)
+│   ├── main.tf                               │  S3 bucket + DynamoDB table
+│   └── provider.tf                            │  AWS provider us-east-1
+│
+├──  modules/                               ← Reusable modules
+│   │
+│   ├──  tenant-network/                   ← Network Module (8 files)
+│   │   ├── main.tf                            │  VPC + Internet Gateway
+│   │   ├── variables.tf                       │  4 variables (contract)
+│   │   ├── subnets.tf                         │  Public + private subnets
+│   │   ├── nat-gateway.tf                     │  Conditional NAT (0, 1, or N)
+│   │   ├── routing.tf                         │  Route tables + associations
+│   │   ├── endpoints.tf                       │  VPC Endpoints (Gateway + Interface)
+│   │   ├── flow-logs.tf                       │  Flow Logs + IAM (prod only)
+│   │   └── outputs.tf                         │  vpc_id, subnet_ids, nat_ids...
+│   │
+│   ├── ️  tenant-eks/                       ← EKS Module (8 files)
+│   │   ├── main.tf                            │  EKS Cluster + KMS + CloudWatch + SG
+│   │   ├── variables.tf                       │  14 variables (contract)
+│   │   ├── providers.tf                       │  Kubectl provider (gavinbunney)
+│   │   ├── iam.tf                             │  3 IAM Roles (cluster, node, karpenter)
+│   │   ├── node-group.tf                      │  Primary On-Demand Node Group
+│   │   ├── karpenter.tf                       │  EC2NodeClass + NodePool + Subnet Tags
+│   │   ├── wait-for-cluster.tf                │  Waits for cluster ACTIVE + nodes READY
+│   │   └── outputs.tf                         │  cluster_id, endpoint, ARNs...
+│   │
+│   └──  tenant-argocd/                    ← ArgoCD Module (9 files)
+│       ├── variables.tf                       │  9 variables (contract)
+│       ├── providers.tf                       │  Helm + Kubectl + Kubernetes
+│       ├── version.tf                         │  Local infra_version
+│       ├── namespace.tf                       │  argocd namespace with labels
+│       ├── helm-release.tf                    │  ArgoCD Helm release
+│       ├── values.yaml                        │  Values: RBAC, Ingress, Resources
+│       ├── applicationsets.tf                 │  2 AppSets (tenants + infra)
+│       ├── projects.tf                        │  2 AppProjects (infra + tenants)
+│       └── outputs.tf                         │  namespace, server, appset names
+│
+├──  environments/                          ← Per-environment configurations
+│   ├── dev/                                   │  Low cost: 1 NAT, no flow logs
+│   │   ├── main.tf                            │  Orchestrator: network → EKS → ArgoCD
+│   │   ├── variables.tf                       │  7 environment variables
+│   │   ├── terraform.tfvars                   │  10.10.0.0/16, 2 AZs, NAT=true
+│   │   └── outputs.tf                         │  10 outputs
+│   ├── staging/                               │  Balanced: 1 NAT, basic endpoints
+│   │   ├── main.tf                            │  Network module only (for now)
+│   │   ├── variables.tf                       │  4 variables
+│   │   ├── terraform.tfvars                   │  10.20.0.0/16, 3 AZs, NAT=1
+│   │   └── outputs.tf                         │  4 outputs
+│   └── prod/                                  │  Full HA: NAT per AZ, flow logs, endpoints
+│       ├── main.tf                            │  Network module only (for now)
+│       ├── variables.tf                       │  4 variables
+│       ├── terraform.tfvars                   │  10.30.0.0/16, 3 AZs, NAT=3
+│       └── outputs.tf                         │  5 outputs
+│
+├── ️  .github/workflows/                   ← CI/CD Pipelines
+│   ├── ci.yml                                 │  Unified CI: fmt + lint + SAST + plan
+│   ├── cd.yml                                 │  Unified CD: tag + apply + Slack
+│   └── security-weekly.yml                    │  Weekly DAST: kube-bench + Popeye
+│
+├──  scripts/                               ← Utility scripts
+│   ├── deploy.sh                              │  Automated deploy + kubeconfig setup
+│   ├── setup-github.sh                        │  Prepares repo for first push
+│   └── version.sh                             │  Local SemVer versioning
+│
+└──  docs/                                  ← Additional documentation
+    ├── github-actions-setup.md                │  Guide: IAM OIDC + Secrets + Environments
+    ├── bootstrap/README.md                    │  Doc: S3/DynamoDB backend
+    ├── modules/
+    │   ├── tenant-network/README.md           │  Doc: Network module
+    │   ├── tenant-eks/README.md               │  Doc: EKS module
+    │   └── tenant-argocd/README.md            │  Doc: ArgoCD module
+    ├── environments/README.md                 │  Doc: Dev/Staging/Prod environments
+    ├── ci-cd/README.md                        │  Doc: GitHub Actions workflows
+    ├── scripts/README.md                      │  Doc: Utility scripts
+    └── architecture/README.md                 │  Doc: Architecture decisions
 ```
 
 ---
 
-##  Pré-Requisitos
+##  Prerequisites
 
-| Ferramenta | Versão Mínima | Propósito |
-|-----------|--------------|-----------|
-| [Terraform](https://www.terraform.io/) | `>= 1.6` | Provisionamento de infraestrutura |
-| [AWS CLI](https://aws.amazon.com/cli/) | `v2` | Autenticação e configuração AWS |
-| [kubectl](https://kubernetes.io/docs/tasks/tools/) | `1.29+` | Interação com o cluster EKS |
-| [Helm](https://helm.sh/) | `3.x` | Instalação do ArgoCD |
-| [Git](https://git-scm.com/) | `2.x` | Controle de versão |
+| Tool | Minimum Version | Purpose |
+|------|----------------|---------|
+| [Terraform](https://www.terraform.io/) | `>= 1.6` | Infrastructure provisioning |
+| [AWS CLI](https://aws.amazon.com/cli/) | `v2` | AWS authentication and configuration |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | `1.29+` | Interaction with the EKS cluster |
+| [Helm](https://helm.sh/) | `3.x` | ArgoCD installation |
+| [Git](https://git-scm.com/) | `2.x` | Version control |
 
-### Conta AWS
+### AWS Account
 
-- Conta AWS com permissões para criar: VPC, EKS, IAM, KMS, CloudWatch, S3, DynamoDB
-- Credenciais configuradas: `aws configure` ou IAM Role via OIDC (CI/CD)
+- AWS account with permissions to create: VPC, EKS, IAM, KMS, CloudWatch, S3, DynamoDB
+- Credentials configured: `aws configure` or IAM Role via OIDC (CI/CD)
 
 ---
 
 ##  Quick Start
 
-### Passo 1 — Bootstrap (executar apenas 1 vez)
+### Step 1 — Bootstrap (run once)
 
-Cria o backend remoto (S3 + DynamoDB) para armazenar o state do Terraform:
+Creates the remote backend (S3 + DynamoDB) to store Terraform state:
 
 ```bash
 cd bootstrap
@@ -228,213 +231,213 @@ terraform init
 terraform apply -auto-approve
 ```
 
-> **O que cria:**
-> - S3 Bucket `tfstate-saas-multi-tenant` (versionado, criptografado, bloqueio público)
+> **What it creates:**
+> - S3 Bucket `tfstate-saas-multi-tenant` (versioned, encrypted, public access blocked)
 > - DynamoDB Table `tfstate-lock` (state locking)
 
-### Passo 2 — Deploy do Ambiente Dev
+### Step 2 — Deploy the Dev Environment
 
-Você pode fazer o deploy do ambiente de desenvolvimento de forma manual ou automatizada:
+You can deploy the development environment either manually or automatically:
 
-#### Opção A: Deploy Automatizado (Recomendado para uso local)
-Para executar o deploy e configurar automaticamente o seu arquivo de conexão `kubeconfig` local:
+#### Option A: Automated Deploy (Recommended for local use)
+Run the deploy script to apply Terraform and automatically configure your local `kubeconfig`:
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-#### Opção B: Deploy Manual
-1. Navegue para o diretório do ambiente:
+#### Option B: Manual Deploy
+1. Navigate to the environment directory:
    ```bash
    cd environments/dev
    ```
-2. Inicialize o Terraform e aplique as configurações:
+2. Initialize Terraform and apply the configuration:
    ```bash
    terraform init
    terraform apply -auto-approve
    ```
-3. Após a conclusão, atualize o seu `kubeconfig` local para obter acesso ao cluster:
+3. After completion, update your local `kubeconfig` to access the cluster:
    ```bash
    aws eks update-kubeconfig --region us-east-1 --name acme-corp-dev-eks
    ```
 
->  **Tempo estimado:** ~20 a 30 minutos (o provisionamento do control plane do EKS, subida dos nós e ArgoCD levam tempo).
+> ️ **Estimated time:** ~20 to 30 minutes (EKS control plane provisioning, node startup, and ArgoCD installation take time).
 >
-> **Dica:** Em caso de erro na primeira aplicação (comum devido a delays de propagação IAM na criação das roles do Kubernetes), aguarde 2 minutos e execute novamente.
+> **Tip:** If the first apply fails (common due to IAM propagation delays during Kubernetes role creation), wait 2 minutes and run again.
 
-### Passo 3 — Deploy de Staging/Prod
+### Step 3 — Deploy Staging/Prod
 
 ```bash
-# Staging (balanceado — 1 NAT)
+# Staging (balanced — 1 NAT)
 cd environments/staging
 terraform init
 terraform apply -auto-approve
 
-# Prod (HA — NAT por AZ, flow logs)
+# Prod (HA — NAT per AZ, flow logs)
 cd environments/prod
 terraform init
 terraform apply -auto-approve
 ```
 
-### Passo 4 — Destruir Recursos
+### Step 4 — Destroy Resources
 
 ```bash
-# Destruir um ambiente específico
+# Destroy a specific environment
 cd environments/dev && terraform destroy -auto-approve
 ```
 
 ---
 
-##  Documentação por Seção
+##  Documentation by Section
 
-Cada componente do projeto possui sua própria documentação detalhada:
+Each project component has its own detailed documentation:
 
-| Seção | Link | Descrição |
-|-------|------|-----------|
-|  Bootstrap | [docs/bootstrap/README.md](docs/bootstrap/README.md) | Backend S3 + DynamoDB, state locking, segurança |
-|  Módulo Network | [docs/modules/tenant-network/README.md](docs/modules/tenant-network/README.md) | VPC, Subnets, NAT, Endpoints, Flow Logs |
-|  Módulo EKS | [docs/modules/tenant-eks/README.md](docs/modules/tenant-eks/README.md) | Cluster EKS, Node Groups, Karpenter, IAM, KMS |
-|  Módulo ArgoCD | [docs/modules/tenant-argocd/README.md](docs/modules/tenant-argocd/README.md) | ArgoCD, ApplicationSets, AppProjects, RBAC |
-|  Environments | [docs/environments/README.md](docs/environments/README.md) | Dev, Staging, Prod — configurações e custos |
-|  CI/CD | [docs/ci-cd/README.md](docs/ci-cd/README.md) | Workflows: CI, CD, Security Weekly |
-|  Scripts | [docs/scripts/README.md](docs/scripts/README.md) | setup-github.sh, version.sh |
-|  Arquitetura | [docs/architecture/README.md](docs/architecture/README.md) | Decisões de design, modelo Silo, FinOps |
+| Section | Link | Description |
+|---------|------|-------------|
+|  Bootstrap | [docs/bootstrap/README.md](docs/bootstrap/README.md) | S3 + DynamoDB backend, state locking, security |
+|  Network Module | [docs/modules/tenant-network/README.md](docs/modules/tenant-network/README.md) | VPC, Subnets, NAT, Endpoints, Flow Logs |
+| ️ EKS Module | [docs/modules/tenant-eks/README.md](docs/modules/tenant-eks/README.md) | EKS Cluster, Node Groups, Karpenter, IAM, KMS |
+|  ArgoCD Module | [docs/modules/tenant-argocd/README.md](docs/modules/tenant-argocd/README.md) | ArgoCD, ApplicationSets, AppProjects, RBAC |
+|  Environments | [docs/environments/README.md](docs/environments/README.md) | Dev, Staging, Prod — configurations and costs |
+| ️ CI/CD | [docs/ci-cd/README.md](docs/ci-cd/README.md) | Workflows: CI, CD, Security Weekly |
+|  Scripts | [docs/scripts/README.md](docs/scripts/README.md) | deploy.sh, setup-github.sh, version.sh |
+| ️ Architecture | [docs/architecture/README.md](docs/architecture/README.md) | Design decisions, Silo model, FinOps |
 
 ---
 
-##  Comparativo de Ambientes
+##  Environment Comparison
 
-| Característica | Dev | Staging | Prod |
-|:--------------|:---:|:-------:|:----:|
+| Feature | Dev | Staging | Prod |
+|:--------|:---:|:-------:|:----:|
 | **CIDR** | `10.10.0.0/16` | `10.20.0.0/16` | `10.30.0.0/16` |
 | **AZs** | 2 | 3 | 3 |
 | **Subnets (pub + priv)** | 2 + 2 | 3 + 3 | 3 + 3 |
-| **NAT Gateway** |  (custo zero) |  1 (single) |  3 (1 por AZ) |
+| **NAT Gateway** |  1 (single) |  1 (single) |  3 (1 per AZ) |
 | **VPC Endpoints Gateway** |  S3 + DynamoDB |  S3 + DynamoDB |  S3 + DynamoDB |
 | **VPC Endpoints Interface** |  |  |  ECR + Logs |
-| **Flow Logs** |  |  |  (90 dias) |
-| **EKS Endpoint** | Público | Público | Privado |
-| **EKS Logs** | `api` | `api` | 5 tipos (full) |
-| **CloudWatch Retenção** | 7 dias | 7 dias | 90 dias |
+| **Flow Logs** |  |  |  (90 days) |
+| **EKS Endpoint** | Public | Public | Private |
+| **EKS Logs** | `api` | `api` | 5 types (full) |
+| **CloudWatch Retention** | 7 days | 7 days | 90 days |
 | **Karpenter CPU Limit** | 2 vCPU | 100 vCPU | 100 vCPU |
 | **KMS Encryption** |  |  |  |
-| **CD Deploy** | Automático | Approval manual | Approval + Freeze |
-| **Custo estimado/mês** | ~$75 | ~$150 | ~$500+ |
+| **CD Deploy** | Automatic | Manual approval | Approval + Freeze |
+| **Estimated cost/mo** | ~$108 | ~$150 | ~$500+ |
 
 ---
 
-##  Pipeline CI/CD
+##  CI/CD Pipeline
 
 ```
-                    
-                           Developer cria PR         
-                    
-                                   
-                    
-                       CI Workflow (ci.yml)          
-                                                     
-                      1. terraform fmt -check        
-                      2. tflint (lint)               
-                      3. Checkov (IaC scan)          
-                      4. Trivy (vuln + secrets)      
-                      5. Gitleaks (secrets scan)     
-                      6. terraform plan (por env)    
-                      7. Comentário no PR            
-                    
-                                    merge
-                    
-                       CD Workflow (cd.yml)          
-                                                     
-                      1. Calcula SemVer tag          
-                      2. Cria Git Tag automática     
-                      3. terraform apply (por env)   
-                      4. Notifica Slack              
-                    
+                    ┌────────────────────────────────┐
+                    │      Developer creates PR      │
+                    └──────────────┬─────────────────┘
+                                   │
+                    ┌──────────────▼─────────────────-┐
+                    │   CI Workflow (ci.yml)          │
+                    │                                 │
+                    │  1. terraform fmt -check        │
+                    │  2. tflint (lint)               │
+                    │  3. Checkov (IaC scan)          │
+                    │  4. Trivy (vuln + secrets)      │
+                    │  5. Gitleaks (secrets scan)     │
+                    │  6. terraform plan (per env)    │
+                    │  7. PR comment with results     │
+                    └──────────────┬─────────────────-┘
+                                   │ merge
+                    ┌──────────────▼────────────────-─┐
+                    │   CD Workflow (cd.yml)          │
+                    │                                 │
+                    │  1. Calculate SemVer tag        │
+                    │  2. Create automatic Git Tag    │
+                    │  3. terraform apply (per env)   │
+                    │  4. Slack notification          │
+                    └───────────────────────────────-─┘
 
-                    
-                     Security Weekly (domingo 8h)   
-                                                     
-                      1. kube-bench (CIS)            
-                      2. Popeye (sanidade cluster)   
-                      3. Kubescape (NSA/CISA)        
-                    
+                    ┌────────────────────────────────-┐
+                    │ Security Weekly (Sunday 8am)    │
+                    │                                 │
+                    │  1. kube-bench (CIS)            │
+                    │  2. Popeye (cluster sanity)     │
+                    │  3. Kubescape (NSA/CISA)        │
+                    └────────────────────────────────-┘
 ```
 
 ---
 
-##  Segurança
+##  Security
 
-### SAST (Static Analysis — em todo PR)
+### SAST (Static Analysis — on every PR)
 
-| Ferramenta | Escopo | Formato |
-|-----------|--------|---------|
-| **Checkov** | IaC misconfigurations | SARIF -> GitHub Security |
-| **Trivy** | Vulnerabilidades + secrets | SARIF -> GitHub Security |
-| **Gitleaks** | Secrets no código/histórico | GitHub native |
-| **TFLint** | Best practices Terraform | Compact |
+| Tool | Scope | Format |
+|------|-------|--------|
+| **Checkov** | IaC misconfigurations | SARIF → GitHub Security |
+| **Trivy** | Vulnerabilities + secrets | SARIF → GitHub Security |
+| **Gitleaks** | Secrets in code/history | GitHub native |
+| **TFLint** | Terraform best practices | Compact |
 
-### DAST (Dynamic Analysis — semanal)
+### DAST (Dynamic Analysis — weekly)
 
-| Ferramenta | Escopo | Quando |
-|-----------|--------|--------|
-| **kube-bench** | CIS Kubernetes Benchmark | Domingo 8h UTC |
-| **Popeye** | Sanidade geral do cluster | Domingo 8h UTC |
-| **Kubescape** | Framework NSA/CISA | Domingo 8h UTC |
+| Tool | Scope | When |
+|------|-------|------|
+| **kube-bench** | CIS Kubernetes Benchmark | Sunday 8am UTC |
+| **Popeye** | General cluster sanity | Sunday 8am UTC |
+| **Kubescape** | NSA/CISA Framework | Sunday 8am UTC |
 
-### Camadas de Proteção
+### Protection Layers
 
-- **Rede**: VPC isolada por tenant, Security Groups, VPC Endpoints (sem tráfego público)
-- **Secrets**: KMS Key com rotação automática para criptografia de secrets do EKS
-- **IAM**: 3 Roles com mínimo privilégio (cluster, node, karpenter)
-- **RBAC**: ArgoCD AppProjects com restrições por tenant
-- **Endpoint**: Em prod, API server EKS é privado (sem acesso público)
-
----
-
-##  FinOps — Otimização de Custos
-
-| Estratégia | Impacto | Onde |
-|-----------|---------|------|
-| **NAT condicional** | $0 em dev vs ~$100/mês em prod | `tenant-network` |
-| **VPC Endpoints Gateway** | Grátis (S3/DynamoDB) | Todos ambientes |
-| **Endpoints Interface só em prod** | ~$20/mês cada | `endpoints.tf` |
-| **Flow Logs só em prod** | ~$5/mês | `flow-logs.tf` |
-| **Karpenter Spot** | 60-90% economia em nodes | `karpenter.tf` |
-| **Karpenter Consolidation** | Remove nós ociosos | `WhenUnderutilized` |
-| **CPU Limit em dev** | Máx 2 vCPU | `karpenter.tf` |
-| **CloudWatch 7d em dev** | Reduz custo de logs | `main.tf` EKS |
-| **Tags de CostCenter** | Visibilidade por tenant | Todos recursos |
-| **Infracost em PRs** | Preview de custo antes do merge | `ci.yml` |
+- **Network**: Isolated VPC per tenant, Security Groups, VPC Endpoints (no public traffic)
+- **Secrets**: KMS Key with automatic rotation for EKS secrets encryption
+- **IAM**: 3 Roles with least privilege (cluster, node, karpenter)
+- **RBAC**: ArgoCD AppProjects with per-tenant restrictions
+- **Endpoint**: In prod, EKS API server is private (no public access)
 
 ---
 
-##  Versionamento SemVer
+##  FinOps — Cost Optimization
 
-O projeto usa **Semantic Versioning** automático:
+| Strategy | Impact | Where |
+|----------|--------|-------|
+| **Conditional NAT** | ~$108/mo in dev (1 NAT) vs ~$300/mo in prod (3 NATs) | `tenant-network` |
+| **Gateway VPC Endpoints** | Free (S3/DynamoDB) | All environments |
+| **Interface Endpoints only in prod** | ~$20/mo each | `endpoints.tf` |
+| **Flow Logs only in prod** | ~$5/mo | `flow-logs.tf` |
+| **Karpenter Spot** | 60-90% savings on nodes | `karpenter.tf` |
+| **Karpenter Consolidation** | Removes idle nodes | `WhenUnderutilized` |
+| **CPU Limit in dev** | Max 2 vCPU | `karpenter.tf` |
+| **CloudWatch 7d in dev** | Reduces log costs | `main.tf` EKS |
+| **CostCenter Tags** | Visibility per tenant | All resources |
+| **Infracost on PRs** | Cost preview before merge | `ci.yml` |
+
+---
+
+## ️ SemVer Versioning
+
+The project uses automatic **Semantic Versioning**:
 
 ```bash
-# Ver versão atual
+# View current version
 ./scripts/version.sh current
 
-# Ver próxima versão
+# View next version
 ./scripts/version.sh next
 
-# Criar e enviar tag
+# Create and push tag
 ./scripts/version.sh tag
 ```
 
-No CI/CD, a tag é criada automaticamente no merge para `main` e passada como `TF_VAR_infra_version` para o `terraform apply`.
+In CI/CD, the tag is automatically created on merge to `main` and passed as `TF_VAR_infra_version` to `terraform apply`.
 
 ---
 
-##  Stack Tecnológica
+## ️ Technology Stack
 
-| Categoria | Tecnologias |
+| Category | Technologies |
 |----------|-------------|
 | **IaC** | Terraform >= 1.6 |
 | **Cloud** | AWS (VPC, EKS, IAM, KMS, S3, DynamoDB, CloudWatch) |
-| **Kubernetes** | EKS 1.31, Karpenter (Spot + On-Demand) |
-| **GitOps** | ArgoCD 7.8.0 com ApplicationSets |
+| **Kubernetes** | EKS 1.31, Karpenter v1 (Spot + On-Demand) |
+| **GitOps** | ArgoCD 7.8.0 with ApplicationSets |
 | **CI/CD** | GitHub Actions (3 workflows) |
 | **SAST** | Checkov, Trivy, TFLint, Gitleaks |
 | **DAST** | kube-bench, Popeye, Kubescape |
@@ -443,28 +446,28 @@ No CI/CD, a tag é criada automaticamente no merge para `main` e passada como `T
 
 ---
 
-##  Próximos Passos
+##  Next Steps
 
-Para tornar a infraestrutura SaaS completa, os próximos módulos seriam:
+To make the SaaS infrastructure complete, the next modules would be:
 
-| # | Módulo | Descrição |
-|---|--------|-----------|
-| 1 | `modules/tenant-compute` | ECS Fargate + ECR por tenant |
-| 2 | `modules/tenant-database` | Aurora PostgreSQL / DynamoDB com `tenant_id` |
-| 3 | `modules/tenant-auth` | Cognito User Pool + tenant claim no JWT |
-| 4 | `modules/tenant-monitoring` | CloudWatch Dashboard por tenant |
-| 5 | `modules/control-plane` | API Gateway + Lambda para onboarding de tenants |
-| 6 | `modules/tenant-billing` | AWS Budgets + Cost Tags por tenant |
+| # | Module | Description |
+|---|--------|-------------|
+| 1 | `modules/tenant-compute` | ECS Fargate + ECR per tenant |
+| 2 | `modules/tenant-database` | Aurora PostgreSQL / DynamoDB with `tenant_id` |
+| 3 | `modules/tenant-auth` | Cognito User Pool + tenant claim in JWT |
+| 4 | `modules/tenant-monitoring` | CloudWatch Dashboard per tenant |
+| 5 | `modules/control-plane` | API Gateway + Lambda for tenant onboarding |
+| 6 | `modules/tenant-billing` | AWS Budgets + Cost Tags per tenant |
 
 ---
 
-##  Licença
+##  License
 
-Este projeto é open source e livre para uso educacional e profissional.
+This project is open source and free to use for educational and professional purposes.
 
 ---
 
 <p align="center">
-  <i>"Um DevOps Sênior não é quem sabe tudo de cabeça.<br>
-  É quem sabe as perguntas certas a fazer e como validar cada passo antes de prosseguir."</i>
+  <i>"A Senior DevOps Engineer isn't someone who knows everything by heart.<br>
+  It's someone who knows the right questions to ask and how to validate each step before moving forward."</i>
 </p>
