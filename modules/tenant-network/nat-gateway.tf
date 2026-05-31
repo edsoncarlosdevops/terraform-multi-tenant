@@ -1,6 +1,6 @@
 # ─── Elastic IP para NAT Gateway ────────────────────────────────
 resource "aws_eip" "nat" {
-  count = var.vpc.single_nat_gateway ? 1 : length(local.azs)
+  count = var.vpc.enable_nat_gateway ? (var.vpc.single_nat_gateway ? 1 : length(local.azs)) : 0
 
   domain = "vpc"
 
