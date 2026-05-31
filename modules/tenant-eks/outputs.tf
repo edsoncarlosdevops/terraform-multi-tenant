@@ -33,6 +33,21 @@ output "karpenter_role_arn" {
   value       = try(aws_iam_role.karpenter[0].arn, "")
 }
 
+output "karpenter_role_name" {
+  description = "Nome da IAM Role do Karpenter (para nodes)"
+  value       = try(aws_iam_role.karpenter[0].name, "")
+}
+
+output "karpenter_controller_role_arn" {
+  description = "ARN da IAM Role do controller do Karpenter (IRSA)"
+  value       = try(aws_iam_role.karpenter_controller[0].arn, "")
+}
+
+output "karpenter_controller_role_name" {
+  description = "Nome da IAM Role do controller do Karpenter (IRSA)"
+  value       = try(aws_iam_role.karpenter_controller[0].name, "")
+}
+
 output "node_role_arn" {
   description = "ARN da IAM Role dos nodes"
   value       = aws_iam_role.node.arn

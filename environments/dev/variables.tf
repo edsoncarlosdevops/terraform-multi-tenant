@@ -38,6 +38,12 @@ variable "enable_karpenter" {
   default     = true
 }
 
+variable "karpenter_instance_families" {
+  description = "Familias de instancia EC2 permitidas pelo Karpenter"
+  type        = list(string)
+  default     = ["m6i", "m6a", "m7i", "c6i", "c7i", "r6i"]
+}
+
 variable "argocd_domain" {
   description = "Domínio para acesso ao ArgoCD (deixar vazio em dev se não tiver DNS)"
   type        = string

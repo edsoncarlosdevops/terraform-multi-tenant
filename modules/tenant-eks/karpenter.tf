@@ -1,99 +1,13 @@
 # ═══════════════════════════════════════════════════════════════
-# KARPENTER: Escalonamento Inteligente de Nos
+# KARPENTER: Tags nas Subnets + Outputs auxiliares
 # ═══════════════════════════════════════════════════════════════
-# Como funciona:
-# 1. EC2NodeClass   → define o "tipo" de maquina (AMI, role, subnets)
-# 2. NodePool       → define as regras de escalonamento (familia, spot, limites)
-# 3. Subnet tags    → permite o Karpenter descobrir as subnets
+# ATENCAO: Os manifests EC2NodeClass e NodePool foram movidos
+# para environments/dev/main.tf porque precisam ser criados
+# APOS a instalacao do controller Karpenter via Helm.
 #
-# IMPORTANTE: O controller do Karpenter precisa ser instalado SEPARADAMENTE
-# via Helm chart (nao via Terraform). Isso e feito manualmente ou via ArgoCD.
-# Estes manifests APENAS configuram o controller DEPOIS de instalado.
-#
-# APIs suportadas (Karpenter v1.x):
-#   - EC2NodeClass: karpenter.k8s.aws/v1
-#   - NodePool:     karpenter.sh/v1
-#
-# Se der erro "no matches for kind EC2NodeClass":
-#   → O controller do Karpenter nao foi instalado ainda
-#   → Solucao: instale o helm chart primeiro (veja scripts/test-full.sh)
+# As tags nas subnets ficam aqui pois sao recursos AWS e
+# podem ser criados em paralelo com o cluster.
 # ═══════════════════════════════════════════════════════════════
-
-resource "kubectl_manifest" "karpenter_node_class" {
-  count = var.enable_karpenter ? 1 : 0
-
-  yaml_body = <<YAML
-apiVersion: karpenter.k8s.aws/v1
-kind: EC2NodeClass
-metadata:
-  name: ${local.name_prefix}
-spec:
-  amiFamily: AL2
-  role: ${aws_iam_role.karpenter[0].name}
-  subnetSelectorTerms:
-    - tags:
-        karpenter.sh/discovery: ${local.name_prefix}
-  securityGroupSelectorTerms:
-    - tags:
-        karpenter.sh/discovery: ${local.name_prefix}
-  tags:
-    Tenant: ${var.tenant}
-    Environment: ${var.environment}
-    ManagedBy: karpenter
-YAML
-
-  depends_on = [
-    aws_eks_cluster.this,
-    null_resource.wait_for_cluster
-  ]
-}
-
-resource "kubectl_manifest" "karpenter_node_pool" {
-  count = var.enable_karpenter ? 1 : 0
-
-  yaml_body = <<YAML
-apiVersion: karpenter.sh/v1
-kind: NodePool
-metadata:
-  name: ${local.name_prefix}
-spec:
-  template:
-    spec:
-      nodeClassRef:
-        group: karpenter.k8s.aws
-        kind: EC2NodeClass
-        name: ${local.name_prefix}
-      requirements:
-        # Familias de instancia permitidas
-        - key: "karpenter.k8s.aws/instance-family"
-          operator: In
-          values: ${jsonencode(var.karpenter_instance_families)}
-        # ─── Em dev: prioriza SPOT (mais barato) ──────────────
-        # Em prod: permite spot + on-demand
-        - key: "karpenter.sh/capacity-type"
-          operator: In
-          values: ["spot", "on-demand"]
-        - key: "kubernetes.io/arch"
-          operator: In
-          values: ["amd64"]
-      # ExpireAfter → nodes sao reciclados a cada 30 dias
-      expireAfter: 720h
-  # ─── LIMITE DE CPU ──────────────────────────────────────────
-  # Dev: max 2 vCPU (evita gastos surpresa durante testes)
-  # Prod: max 100 vCPU (ajuste conforme necessidade)
-  limits:
-    cpu: ${var.environment == "dev" ? 2 : 100}
-  # ─── CONSOLIDACAO ───────────────────────────────────────────
-  # WhenUnderutilized → Karpenter remove nos ociosos automaticamente
-  disruption:
-    consolidationPolicy: WhenUnderutilized
-YAML
-
-  depends_on = [
-    aws_eks_cluster.this,
-    null_resource.wait_for_cluster
-  ]
-}
 
 # ─── Tags nas subnets para o Karpenter descobrir ────────────
 # Sem isso, o Karpenter nao sabe em quais subnets criar os nodes

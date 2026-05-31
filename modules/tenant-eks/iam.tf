@@ -84,6 +84,80 @@ resource "aws_iam_role" "karpenter" {
   tags = var.tags
 }
 
+# ─── OIDC Provider do EKS (para IRSA) ────────────────────────
+data "tls_certificate" "eks" {
+  url = aws_eks_cluster.this.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
+}
+
+# ─── IAM Role para IRSA do Karpenter (controller) ────────────
+# O controller do Karpenter precisa de permissões para criar
+# instâncias EC2, Launch Templates, etc.
+# Esta role é assumida pela service account karpenter no cluster.
+resource "aws_iam_role" "karpenter_controller" {
+  count = var.enable_karpenter ? 1 : 0
+
+  name = "${local.name_prefix}-karpenter-controller-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${replace(aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:karpenter"
+        }
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_controller_worker" {
+  count = var.enable_karpenter ? 1 : 0
+
+  role       = aws_iam_role.karpenter_controller[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_controller_cni" {
+  count = var.enable_karpenter ? 1 : 0
+
+  role       = aws_iam_role.karpenter_controller[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_controller_ecr" {
+  count = var.enable_karpenter ? 1 : 0
+
+  role       = aws_iam_role.karpenter_controller[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_controller_ssm" {
+  count = var.enable_karpenter ? 1 : 0
+
+  role       = aws_iam_role.karpenter_controller[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_controller_custom" {
+  count = var.enable_karpenter ? 1 : 0
+
+  role       = aws_iam_role.karpenter_controller[0].name
+  policy_arn = aws_iam_policy.karpenter[0].arn
+}
+
 resource "aws_iam_role_policy_attachment" "karpenter_worker" {
   count = var.enable_karpenter ? 1 : 0
 
