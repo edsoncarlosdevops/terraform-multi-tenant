@@ -10,6 +10,10 @@
 # via Helm chart (nao via Terraform). Isso e feito manualmente ou via ArgoCD.
 # Estes manifests APENAS configuram o controller DEPOIS de instalado.
 #
+# APIs suportadas (Karpenter v1.x):
+#   - EC2NodeClass: karpenter.k8s.aws/v1
+#   - NodePool:     karpenter.sh/v1
+#
 # Se der erro "no matches for kind EC2NodeClass":
 #   → O controller do Karpenter nao foi instalado ainda
 #   → Solucao: instale o helm chart primeiro (veja scripts/test-full.sh)
@@ -19,7 +23,7 @@ resource "kubectl_manifest" "karpenter_node_class" {
   count = var.enable_karpenter ? 1 : 0
 
   yaml_body = <<YAML
-apiVersion: karpenter.k8s.aws/v1beta1
+apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass
 metadata:
   name: ${local.name_prefix}
@@ -48,7 +52,7 @@ resource "kubectl_manifest" "karpenter_node_pool" {
   count = var.enable_karpenter ? 1 : 0
 
   yaml_body = <<YAML
-apiVersion: karpenter.sh/v1beta1
+apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
   name: ${local.name_prefix}
@@ -56,8 +60,11 @@ spec:
   template:
     spec:
       nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
         name: ${local.name_prefix}
       requirements:
+        # Familias de instancia permitidas
         - key: "karpenter.k8s.aws/instance-family"
           operator: In
           values: ${jsonencode(var.karpenter_instance_families)}
@@ -69,6 +76,8 @@ spec:
         - key: "kubernetes.io/arch"
           operator: In
           values: ["amd64"]
+      # ExpireAfter → nodes sao reciclados a cada 30 dias
+      expireAfter: 720h
   # ─── LIMITE DE CPU ──────────────────────────────────────────
   # Dev: max 2 vCPU (evita gastos surpresa durante testes)
   # Prod: max 100 vCPU (ajuste conforme necessidade)
@@ -76,10 +85,8 @@ spec:
     cpu: ${var.environment == "dev" ? 2 : 100}
   # ─── CONSOLIDACAO ───────────────────────────────────────────
   # WhenUnderutilized → Karpenter remove nos ociosos automaticamente
-  # ExpireAfter 720h → nodes sao reciclados a cada 30 dias
   disruption:
     consolidationPolicy: WhenUnderutilized
-    expireAfter: 720h
 YAML
 
   depends_on = [
