@@ -81,8 +81,8 @@ Este projeto implementa uma **infraestrutura SaaS multi-tenant completa na AWS**
                               │  (us-east-1)  │
                               └───────┬───────┘
                                       │
-        ┌─────────────────────────────┼─────────────────────────────┐
-        │                             │                             │
+        ┌─────────────────────────────┼────────────────────────────┐
+        │                             │                            │
    ┌────┴────┐                  ┌─────┴────┐                 ┌─────┴────┐
    │   DEV   │                  │ STAGING  │                 │   PROD   │
    │ 10.10.x │                  │ 10.20.x  │                 │ 10.30.x  │
@@ -92,11 +92,11 @@ Este projeto implementa uma **infraestrutura SaaS multi-tenant completa na AWS**
         │                            │                             │
    ┌────┴────────────┐    ┌──────────┴──────────┐    ┌─────────────┴────────┐
    │  EKS Cluster    │    │  EKS Cluster        │    │  EKS Cluster         │
-   │  + Karpenter    │    │  + Karpenter         │    │  + Karpenter         │
-   │  + ArgoCD       │    │  + ArgoCD            │    │  + ArgoCD            │
-   │  CPU limit: 2   │    │  CPU limit: 100      │    │  CPU limit: 100      │
-   │  Logs: api only │    │  Logs: api only      │    │  Logs: full (5 tipos)│
-   │  KMS: ✅        │    │  KMS: ✅              │    │  KMS: ✅ + Flow Logs │
+   │  + Karpenter    │    │  + Karpenter        │    │  + Karpenter         │
+   │  + ArgoCD       │    │  + ArgoCD           │    │  + ArgoCD            │
+   │  CPU limit: 2   │    │  CPU limit: 100     │    │  CPU limit: 100      │
+   │  Logs: api only │    │  Logs: api only     │    │  Logs: full (5 tipos)│
+   │  KMS: ✅        │    │  KMS: ✅             │    │  KMS: ✅ + Flow Logs │
    └─────────────────┘    └─────────────────────┘    └──────────────────────┘
 ```
 
@@ -336,11 +336,11 @@ Cada componente do projeto possui sua própria documentação detalhada:
 ## 🔄 Pipeline CI/CD
 
 ```
-                    ┌────────────────────────────────┐
+                    ┌────────────────────────────────-┐
                     │       Developer cria PR         │
-                    └──────────────┬─────────────────┘
+                    └──────────────┬─────────────────-┘
                                    │
-                    ┌──────────────▼─────────────────┐
+                    ┌──────────────▼────────────────-─┐
                     │   CI Workflow (ci.yml)          │
                     │                                 │
                     │  1. terraform fmt -check        │
@@ -350,24 +350,24 @@ Cada componente do projeto possui sua própria documentação detalhada:
                     │  5. Gitleaks (secrets scan)     │
                     │  6. terraform plan (por env)    │
                     │  7. Comentário no PR            │
-                    └──────────────┬─────────────────┘
+                    └──────────────┬─────────────────-┘
                                    │ merge
-                    ┌──────────────▼─────────────────┐
+                    ┌──────────────▼───────────────-──┐
                     │   CD Workflow (cd.yml)          │
                     │                                 │
                     │  1. Calcula SemVer tag          │
                     │  2. Cria Git Tag automática     │
                     │  3. terraform apply (por env)   │
                     │  4. Notifica Slack              │
-                    └────────────────────────────────┘
+                    └───────────────────────────────-─┘
 
-                    ┌────────────────────────────────┐
-                    │ Security Weekly (domingo 8h)   │
+                    ┌───────────────────────────────-─┐
+                    │ Security Weekly (domingo 8h)    │
                     │                                 │
                     │  1. kube-bench (CIS)            │
                     │  2. Popeye (sanidade cluster)   │
                     │  3. Kubescape (NSA/CISA)        │
-                    └────────────────────────────────┘
+                    └────────────────────────────────-┘
 ```
 
 ---
